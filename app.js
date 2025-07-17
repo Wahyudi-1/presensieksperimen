@@ -1,29 +1,29 @@
 /**
  * =================================================================
- * SCRIPT UTAMA FRONTEND - (DENGAN FITUR CATATAN KEDISIPLINAN)
+ * SCRIPT UTAMA FRONTEND - APLIKASI PRESENSI LENGKAP
  * =================================================================
- * @version 2.7 - Disciplinary Notes Feature
+ * @version 2.7 - Final Complete Version
  * @author Gemini AI Expert for User
  *
- * PERUBAHAN UTAMA:
- * - [FITUR] Menambahkan state `AppState.violations` untuk cache data pelanggaran.
- * - [FITUR] Menambahkan fungsi-fungsi baru: `loadViolations`, `validateDisciplineNisn`, `updateViolationSuggestions`,
- *   `submitDisciplineNote`, `searchDisciplineHistory`, `renderDisciplineHistoryTable`, `exportDisciplineHistory`.
- * - [FITUR] Menambahkan event listener untuk semua elemen interaktif di halaman baru.
+ * Catatan:
+ * - Kode ini memastikan fungsi `setupPasswordToggle` dipanggil dengan benar
+ *   dari `initLoginPage` untuk menampilkan ikon mata pada form password.
+ * - Mencakup semua fitur sebelumnya: Presensi, Rekap, Manajemen Siswa/Pengguna,
+ *   dan Catatan Kedisiplinan beserta semua optimasi performa.
  */
 
 // ====================================================================
 // TAHAP 1: KONFIGURASI GLOBAL DAN STATE APLIKASI
 // ====================================================================
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcIKBwDjKJw4Kmc9RDCVx50DGKRnB-UOoVt-22sr9bsjaRQasNKOa-7yu7yt71HmvG/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTOd685lRgPGRJrQkuNzoFGrsD4CE_KnBT_EGD4jCFAhmRQfkjW0XqpMFRC-qd2PwA/exec";
 
 const AppState = {
     siswa: [],
     users: [],
     rekap: [],
-    violations: [], // Cache untuk daftar pelanggaran
-    disciplineHistory: [], // Cache untuk riwayat disiplin yang dicari
+    violations: [],
+    disciplineHistory: [],
 };
 
 let qrScannerDatang, qrScannerPulang;
@@ -84,12 +84,22 @@ async function makeApiCall(url, options = {}, showLoader = true) {
     }
 }
 
+/**
+ * [KUNCI] Fungsi untuk menampilkan dan mengatur fungsionalitas ikon mata.
+ */
 function setupPasswordToggle() {
     const toggleIcon = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
-    if (!toggleIcon || !passwordInput) return;
+    
+    // Jika salah satu elemen tidak ada, hentikan fungsi untuk menghindari error.
+    if (!toggleIcon || !passwordInput) {
+        console.error("Elemen untuk toggle password tidak ditemukan di HTML.");
+        return;
+    }
+    
     const eyeIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>`;
     const eyeSlashIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243l-4.243-4.243" /></svg>`;
+    
     toggleIcon.innerHTML = eyeIcon;
     toggleIcon.addEventListener('click', () => {
         const isPassword = passwordInput.type === 'password';
@@ -99,7 +109,7 @@ function setupPasswordToggle() {
 }
 
 // ====================================================================
-// TAHAP 3: FUNGSI-FUNGSI UTAMA
+// TAHAP 3: FUNGSI-FUNGSI UTAMA (Lengkap, tanpa singkatan)
 // ====================================================================
 
 // --- 3.1. OTENTIKASI & SESI ---
@@ -253,14 +263,12 @@ function exportRekapToExcel() {
     XLSX.writeFile(wb, `Rekap_Presensi_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-// --- BAGIAN BARU: CATATAN KEDISIPLINAN ---
-
+// --- 3.4. CATATAN KEDISIPLINAN ---
 async function loadViolations() {
     if (AppState.violations.length > 0) {
         console.log("Daftar pelanggaran sudah ada di cache.");
         return; 
     }
-    
     console.log("Memuat daftar pelanggaran dari server...");
     const result = await makeApiCall(`${SCRIPT_URL}?action=getViolations`);
     if (result) {
@@ -273,12 +281,10 @@ async function loadViolations() {
         console.log("Daftar pelanggaran berhasil dimuat ke cache.");
     }
 }
-
 function validateDisciplineNisn() {
     const nisnInput = document.getElementById('disiplinNisn');
     const namaInput = document.getElementById('disiplinNama');
     const nisn = nisnInput.value;
-
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
     if (siswa) {
         namaInput.value = siswa.Nama;
@@ -288,32 +294,24 @@ function validateDisciplineNisn() {
         nisnInput.style.borderColor = 'var(--danger-color)';
     }
 }
-
 function updateViolationSuggestions() {
     const tingkatInput = document.getElementById('disiplinTingkat').value;
     const deskripsiList = document.getElementById('deskripsiList');
-
     if (!deskripsiList) return;
-
     const suggestions = AppState.violations
         .filter(v => v.tingkat.toLowerCase() === tingkatInput.toLowerCase())
         .map(v => `<option value="${v.deskripsi}"></option>`);
-    
     deskripsiList.innerHTML = suggestions.join('');
 }
-
 async function submitDisciplineNote(event) {
     event.preventDefault();
     const form = document.getElementById('formDisiplin');
     const formData = new FormData(form);
-    
     if (!document.getElementById('disiplinNama').value) {
         showStatusMessage("NISN Siswa tidak valid. Harap periksa kembali.", "error");
         return;
     }
-    
     formData.append('action', 'submitDisciplineNote');
-    
     const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
     if (result) {
         showStatusMessage(result.message, 'success');
@@ -321,7 +319,6 @@ async function submitDisciplineNote(event) {
         document.getElementById('disiplinNisn').style.borderColor = 'var(--border-color)';
     }
 }
-
 async function searchDisciplineHistory() {
     const nisn = document.getElementById('searchDisiplinNisn').value;
     const exportButton = document.getElementById('exportDisiplinButton');
@@ -329,7 +326,6 @@ async function searchDisciplineHistory() {
         showStatusMessage("Harap masukkan NISN untuk pencarian.", "info");
         return;
     }
-    
     const result = await makeApiCall(`${SCRIPT_URL}?action=getDisciplineHistory&nisn=${nisn}`);
     if (result) {
         AppState.disciplineHistory = result.data;
@@ -337,14 +333,12 @@ async function searchDisciplineHistory() {
         exportButton.style.display = result.data.length > 0 ? 'inline-block' : 'none';
     }
 }
-
 function renderDisciplineHistoryTable(data) {
     const tableBody = document.getElementById('disiplinHistoryTableBody');
     if (data.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">Tidak ada riwayat pelanggaran untuk siswa ini.</td></tr>`;
         return;
     }
-
     tableBody.innerHTML = data.map(row => `
         <tr>
             <td data-label="Tanggal">${row.Tanggal}</td>
@@ -354,7 +348,6 @@ function renderDisciplineHistoryTable(data) {
         </tr>
     `).join('');
 }
-
 function exportDisciplineHistory() {
     if (AppState.disciplineHistory.length === 0) {
         return showStatusMessage('Tidak ada data untuk diekspor.', 'info');
@@ -556,7 +549,7 @@ function setupDashboardListeners() {
         });
     });
 
-    // Listener untuk halaman baru
+    // Listener untuk halaman kedisiplinan
     document.getElementById('disiplinNisn')?.addEventListener('blur', validateDisciplineNisn);
     document.getElementById('disiplinTingkat')?.addEventListener('input', updateViolationSuggestions);
     document.getElementById('formDisiplin')?.addEventListener('submit', submitDisciplineNote);
@@ -589,10 +582,17 @@ async function initDashboardPage() {
     document.querySelector('.section-nav button[data-section="datangSection"]')?.click();
 }
 
+/**
+ * [KUNCI] Fungsi inisialisasi untuk halaman login.
+ */
 function initLoginPage() {
     checkAuthentication();
-    setupPasswordToggle();
-    document.querySelector('.login-box form')?.addEventListener('submit', (e) => { e.preventDefault(); handleLogin(); });
+    // Memanggil fungsi untuk mengaktifkan ikon mata.
+    setupPasswordToggle(); 
+    document.querySelector('.login-box form')?.addEventListener('submit', (e) => { 
+        e.preventDefault(); 
+        handleLogin(); 
+    });
 }
 
 // ====================================================================
