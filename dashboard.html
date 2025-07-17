@@ -140,10 +140,11 @@
                 </div>
                 <form id="formPengguna" class="form-container">
                     <input type="hidden" id="formUsernameOld">
-                    <div class="form-group"><label for="formNamaPengguna">Nama Lengkap</label><input type="text" id="formNamaPengguna" placeholder="Contoh: Budi Santoso" required></div>
-                    <div class="form-group"><label for="formUsername">Username</label><input type="text" id="formUsername" placeholder="Username untuk login" required></div>
-                    <div class="form-group"><label for="formPassword">Password</label><input type="password" id="formPassword" placeholder="Isi untuk password baru"><small class="form-helper-text">Kosongkan jika tidak ingin mengubah password.</small></div>
-                    <div class="form-group"><label for="formPeran">Peran (Role)</label><select id="formPeran" required><option value="Admin">Admin</option><option value="Operator">Operator</option></select></div>
+                    <!-- [PERBAIKAN] Menambahkan atribut 'name' yang sesuai dengan backend -->
+                    <div class="form-group"><label for="formNamaPengguna">Nama Lengkap</label><input type="text" id="formNamaPengguna" name="nama" placeholder="Contoh: Budi Santoso" required></div>
+                    <div class="form-group"><label for="formUsername">Username</label><input type="text" id="formUsername" name="username" placeholder="Username untuk login" required></div>
+                    <div class="form-group"><label for="formPassword">Password</label><input type="password" id="formPassword" name="password" placeholder="Isi untuk password baru"><small class="form-helper-text">Kosongkan jika tidak ingin mengubah password.</small></div>
+                    <div class="form-group"><label for="formPeran">Peran (Role)</label><select id="formPeran" name="peran" required><option value="Admin">Admin</option><option value="Operator">Operator</option></select></div>
                     <div class="form-actions"><button type="submit" id="savePenggunaButton" class="btn btn-accent">Simpan Pengguna</button><button type="button" id="resetPenggunaButton" class="btn btn-secondary">Batal</button></div>
                 </form>
                 <hr style="margin: 2rem 0; border: 0; border-top: 1px solid var(--border-color);">
