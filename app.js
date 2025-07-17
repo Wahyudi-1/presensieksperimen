@@ -1,17 +1,16 @@
 /**
  * =================================================================
- * SCRIPT UTAMA FRONTEND - SISTEM PRESENSI QR (VERSI DIPERBAIKI DENGAN METODE FormData)
+ * SCRIPT UTAMA FRONTEND - SISTEM PRESENSI QR (DENGAN OPTIMASI NAVIGASI)
  * =================================================================
- * @version 2.4 - Performance Optimization
+ * @version 2.5 - Navigation Performance Optimization
  * @author Gemini AI Expert for User
  *
  * PERUBAHAN UTAMA:
- * - [PERFORMA] Fungsi `processQrScan` diubah untuk mencari nama siswa dari cache `AppState.siswa` di frontend,
- *   bukan lagi meminta dari backend. Ini secara drastis mengurangi waktu respons scan.
- * - [PERFORMA] Menambahkan fungsi `loadAllSiswaIntoCache` yang dipanggil saat dashboard dimuat untuk
- *   memastikan data siswa selalu tersedia untuk proses scan yang cepat.
- * - [UX] Memperbarui `makeApiCall` untuk tidak menampilkan loading indicator pada proses scan,
- *   agar terasa lebih instan.
+ * - [PERFORMA] Fungsi `loadSiswaAndRenderTable` dan `loadUsers` sekarang memeriksa cache `AppState` terlebih dahulu.
+ *   API call hanya dilakukan jika cache kosong, membuat navigasi antar halaman terasa instan.
+ * - [FITUR] Menambahkan listener untuk tombol "Muat Ulang Data" (Refresh) di halaman Siswa dan Pengguna
+ *   untuk memaksa pengambilan data terbaru dari server.
+ * - [OPTIMASI] Logika pemuatan data di-refactor untuk mendukung pemuatan paksa (force load).
  */
 
 // ====================================================================
@@ -67,9 +66,6 @@ function playSound(type) {
     } catch (e) { console.warn("Web Audio API tidak didukung atau gagal.", e); }
 }
 
-/**
- * [PERFORMA] Parameter baru `showLoader` ditambahkan.
- */
 async function makeApiCall(url, options = {}, showLoader = true) {
     if (showLoader) showLoading(true);
     try {
@@ -170,17 +166,11 @@ function stopQrScanner(type) {
     }
 }
 
-/**
- * [PERFORMA] Fungsi ini diubah total untuk optimasi.
- */
 async function processQrScan(qrData, type) {
     const resultEl = document.getElementById(type === 'datang' ? 'scanResultDatang' : 'scanResultPulang');
     const nisn = qrData;
-
-    // 1. Cari siswa di cache frontend terlebih dahulu
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
 
-    // Jika siswa tidak ditemukan di cache, tampilkan error tanpa ke backend
     if (!siswa) {
         const errorMessage = `Siswa dengan NISN ${nisn} tidak terdaftar.`;
         resultEl.className = 'scan-result error';
@@ -190,25 +180,21 @@ async function processQrScan(qrData, type) {
         return;
     }
 
-    // 2. Jika ditemukan, siapkan data untuk dikirim ke backend
     const formData = new FormData();
     formData.append('action', 'recordAttendance');
-    formData.append('nisn', nisn); // Kirim NISN saja
+    formData.append('nisn', nisn);
     formData.append('type', type);
 
-    // 3. Panggil API tanpa menampilkan loading overlay
     const result = await makeApiCall(SCRIPT_URL, {
       method: 'POST',
       body: formData 
-    }, false); // `false` berarti tidak menampilkan loader
+    }, false); 
 
     if (result) {
         playSound('success');
         resultEl.className = 'scan-result success';
-        // Gunakan nama dari cache, bukan dari respons backend
         resultEl.innerHTML = `<strong>${result.message}</strong><br>${siswa.Nama} (${nisn}) - ${result.waktu}`;
         const logTable = document.getElementById(type === 'datang' ? 'logTableBodyDatang' : 'logTableBodyPulang');
-        // Gunakan nama dari cache
         logTable.insertRow(0).innerHTML = `<td>${result.waktu}</td><td>${nisn}</td><td>${siswa.Nama}</td>`;
     } else {
         resultEl.className = 'scan-result error';
@@ -251,9 +237,17 @@ function exportRekapToExcel() {
 
 // --- 3.4. MANAJEMEN SISWA & QR CODE ---
 /**
- * [PERFORMA] Fungsi ini diganti namanya agar lebih jelas.
+ * [PERFORMA] Fungsi ini sekarang memeriksa cache.
+ * @param {boolean} force - Jika true, akan memaksa fetch dari server.
  */
-async function loadSiswaAndRenderTable() {
+async function loadSiswaAndRenderTable(force = false) {
+    if (!force && AppState.siswa.length > 0) {
+        console.log("Memuat data siswa dari cache...");
+        renderSiswaTable(AppState.siswa);
+        return;
+    }
+    
+    console.log("Memuat data siswa dari server...");
     const result = await makeApiCall(`${SCRIPT_URL}?action=getSiswa`);
     if (result) {
         AppState.siswa = result.data; // Simpan ke cache
@@ -278,7 +272,7 @@ async function saveSiswa() {
     if (result) {
         showStatusMessage(result.message, 'success');
         resetFormSiswa();
-        loadSiswaAndRenderTable(); // Muat ulang data
+        await loadSiswaAndRenderTable(true); // Paksa muat ulang setelah simpan
     }
 }
 
@@ -307,7 +301,7 @@ async function deleteSiswaHandler(nisn) {
         const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
         if (result) {
             showStatusMessage(result.message, 'success');
-            loadSiswaAndRenderTable(); // Muat ulang data
+            await loadSiswaAndRenderTable(true); // Paksa muat ulang setelah hapus
         }
     }
 }
@@ -335,10 +329,22 @@ function printQrCode() {
 }
 
 // --- 3.5. MANAJEMEN PENGGUNA ---
-async function loadUsers() {
+/**
+ * [PERFORMA] Fungsi ini sekarang memeriksa cache.
+ * @param {boolean} force - Jika true, akan memaksa fetch dari server.
+ */
+async function loadUsers(force = false) {
+    if (!force && AppState.users.length > 0) {
+        console.log("Memuat data pengguna dari cache...");
+        renderUsersTable(AppState.users);
+        return;
+    }
+    console.log("Memuat data pengguna dari server...");
     const result = await makeApiCall(`${SCRIPT_URL}?action=getUsers`);
-    if (result) AppState.users = result.data;
-    renderUsersTable(AppState.users);
+    if (result) {
+        AppState.users = result.data;
+        renderUsersTable(AppState.users);
+    }
 }
 
 function renderUsersTable(usersArray) {
@@ -360,7 +366,7 @@ async function saveUser() {
     if (result) {
         showStatusMessage(result.message, 'success');
         resetFormPengguna();
-        loadUsers();
+        await loadUsers(true); // Paksa muat ulang setelah simpan
     }
 }
 
@@ -386,7 +392,7 @@ async function deleteUserHandler(username) {
         const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
         if (result) {
             showStatusMessage(result.message, 'success');
-            loadUsers();
+            await loadUsers(true); // Paksa muat ulang setelah hapus
         }
     }
 }
@@ -397,12 +403,9 @@ function resetFormPengguna() {
     document.getElementById('savePenggunaButton').textContent = 'Simpan Pengguna';
 }
 
-/**
- * [PERFORMA] Fungsi baru untuk memuat semua data siswa ke cache.
- */
 async function loadAllSiswaIntoCache() {
     console.log("Memuat data siswa ke cache...");
-    const result = await makeApiCall(`${SCRIPT_URL}?action=getSiswa`, {}, false); // Tidak menampilkan loader
+    const result = await makeApiCall(`${SCRIPT_URL}?action=getSiswa`, {}, false);
     if (result) {
         AppState.siswa = result.data;
         console.log(`${AppState.siswa.length} data siswa berhasil dimuat ke cache.`);
@@ -436,12 +439,17 @@ function setupDashboardListeners() {
                     document.getElementById('rekapFilterTanggalSelesai').value = today;
                     loadRekapPresensi();
                 },
-                siswaSection: loadSiswaAndRenderTable,
-                penggunaSection: loadUsers,
+                siswaSection: () => loadSiswaAndRenderTable(),
+                penggunaSection: () => loadUsers(),
             };
             actions[sectionId]?.();
         });
     });
+
+    // [PERFORMA] Tambahkan listener untuk tombol refresh
+    document.getElementById('refreshSiswaButton')?.addEventListener('click', () => loadSiswaAndRenderTable(true));
+    document.getElementById('refreshUsersButton')?.addEventListener('click', () => loadUsers(true));
+
     document.getElementById('filterRekapButton')?.addEventListener('click', loadRekapPresensi);
     document.getElementById('exportRekapButton')?.addEventListener('click', exportRekapToExcel);
     document.getElementById('formSiswa')?.addEventListener('submit', (e) => { e.preventDefault(); saveSiswa(); });
@@ -457,7 +465,6 @@ function setupDashboardListeners() {
 async function initDashboardPage() {
     checkAuthentication();
     setupDashboardListeners();
-    // [PERFORMA] Panggil fungsi cache saat dashboard pertama kali dimuat
     await loadAllSiswaIntoCache(); 
     document.querySelector('.section-nav button[data-section="datangSection"]')?.click();
 }
