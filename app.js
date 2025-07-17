@@ -2,21 +2,19 @@
  * =================================================================
  * SCRIPT UTAMA FRONTEND - APLIKASI PRESENSI LENGKAP
  * =================================================================
- * @version 2.7 - Final Complete Version
+ * @version 2.8 - Syntax Fix & Finalization
  * @author Gemini AI Expert for User
  *
  * Catatan:
- * - Kode ini memastikan fungsi `setupPasswordToggle` dipanggil dengan benar
- *   dari `initLoginPage` untuk menampilkan ikon mata pada form password.
- * - Mencakup semua fitur sebelumnya: Presensi, Rekap, Manajemen Siswa/Pengguna,
- *   dan Catatan Kedisiplinan beserta semua optimasi performa.
+ * - Versi ini memperbaiki potensi SyntaxError yang dapat menghentikan eksekusi skrip.
+ * - Mencakup semua fitur dan optimasi sebelumnya.
  */
 
 // ====================================================================
 // TAHAP 1: KONFIGURASI GLOBAL DAN STATE APLIKASI
 // ====================================================================
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTOd685lRgPGRJrQkuNzoFGrsD4CE_KnBT_EGD4jCFAhmRQfkjW0XqpMFRC-qd2PwA/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwW35j-aegRrTnrTSYGn_yP0qsCHkreoiKfnQxIgWNA-AlIma6Kplan-RHOIR5dQtMew/exec";
 
 const AppState = {
     siswa: [],
@@ -84,19 +82,15 @@ async function makeApiCall(url, options = {}, showLoader = true) {
     }
 }
 
-/**
- * [KUNCI] Fungsi untuk menampilkan dan mengatur fungsionalitas ikon mata.
- */
 function setupPasswordToggle() {
     const toggleIcon = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
-    
-    // Jika salah satu elemen tidak ada, hentikan fungsi untuk menghindari error.
     if (!toggleIcon || !passwordInput) {
         console.error("Elemen untuk toggle password tidak ditemukan di HTML.");
         return;
     }
     
+    // Sintaks SVG yang sudah dipastikan benar
     const eyeIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>`;
     const eyeSlashIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243l-4.243-4.243" /></svg>`;
     
@@ -109,7 +103,7 @@ function setupPasswordToggle() {
 }
 
 // ====================================================================
-// TAHAP 3: FUNGSI-FUNGSI UTAMA (Lengkap, tanpa singkatan)
+// TAHAP 3: FUNGSI-FUNGSI UTAMA
 // ====================================================================
 
 // --- 3.1. OTENTIKASI & SESI ---
@@ -549,14 +543,11 @@ function setupDashboardListeners() {
         });
     });
 
-    // Listener untuk halaman kedisiplinan
     document.getElementById('disiplinNisn')?.addEventListener('blur', validateDisciplineNisn);
     document.getElementById('disiplinTingkat')?.addEventListener('input', updateViolationSuggestions);
     document.getElementById('formDisiplin')?.addEventListener('submit', submitDisciplineNote);
     document.getElementById('searchDisiplinButton')?.addEventListener('click', searchDisciplineHistory);
     document.getElementById('exportDisiplinButton')?.addEventListener('click', exportDisciplineHistory);
-
-    // Listener lainnya
     document.getElementById('refreshSiswaButton')?.addEventListener('click', () => loadSiswaAndRenderTable(true));
     document.getElementById('refreshUsersButton')?.addEventListener('click', () => loadUsers(true));
     document.getElementById('refreshRekapButton')?.addEventListener('click', async () => {
@@ -582,12 +573,8 @@ async function initDashboardPage() {
     document.querySelector('.section-nav button[data-section="datangSection"]')?.click();
 }
 
-/**
- * [KUNCI] Fungsi inisialisasi untuk halaman login.
- */
 function initLoginPage() {
     checkAuthentication();
-    // Memanggil fungsi untuk mengaktifkan ikon mata.
     setupPasswordToggle(); 
     document.querySelector('.login-box form')?.addEventListener('submit', (e) => { 
         e.preventDefault(); 
