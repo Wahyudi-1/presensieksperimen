@@ -14,7 +14,7 @@
 // TAHAP 1: KONFIGURASI GLOBAL DAN STATE APLIKASI
 // ====================================================================
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwW35j-aegRrTnrTSYGn_yP0qsCHkreoiKfnQxIgWNA-AlIma6Kplan-RHOIR5dQtMew/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTOd685lRgPGRJrQkuNzoFGrsD4CE_KnBT_EGD4jCFAhmRQfkjW0XqpMFRC-qd2PwA/exec";
 
 const AppState = {
     siswa: [],
