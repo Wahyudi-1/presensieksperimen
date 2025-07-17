@@ -29,9 +29,10 @@
         <button data-section="datangSection" class="btn btn-nav">Presensi Datang</button>
         <button data-section="pulangSection" class="btn btn-nav">Presensi Pulang</button>
         <button data-section="rekapSection" class="btn btn-nav">Rekap Presensi</button>
-        <button data-section="disiplinSection" class="btn btn-nav">Catatan Kedisiplinan</button>
         <button data-section="siswaSection" class="btn btn-nav">Manajemen Siswa</button>
         <button data-section="penggunaSection" class="btn btn-nav">Manajemen Pengguna</button>
+        <!-- [PERUBAHAN] Menambahkan tombol navigasi baru -->
+        <button data-section="disiplinSection" class="btn btn-nav">Catatan Disiplin</button>
     </nav>
 
     <main class="container">
@@ -104,74 +105,7 @@
         </div>
 
         <!-- ====================================================== -->
-        <!-- Bagian Baru: CATATAN KEDISIPLINAN                      -->
-        <!-- ====================================================== -->
-        <div id="disiplinSection" class="content-section" style="display: none;">
-            <div class="card">
-                <div class="card-header">Input Catatan Kedisiplinan Siswa</div>
-                <form id="formDisiplin">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="disiplinNisn">NISN Siswa</label>
-                            <input type="number" id="disiplinNisn" name="nisn" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="disiplinNama">Nama Siswa</label>
-                            <input type="text" id="disiplinNama" name="nama" readonly style="background-color: #e9ecef;">
-                        </div>
-                    </div>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="disiplinTingkat">Tingkat Pelanggaran</label>
-                            <input type="text" list="tingkatList" id="disiplinTingkat" name="tingkat" placeholder="cth: Ringan, Sedang, Berat" required>
-                            <datalist id="tingkatList"></datalist>
-                        </div>
-                        <div class="form-group">
-                            <label for="disiplinDeskripsi">Deskripsi Pelanggaran</label>
-                            <input type="text" list="deskripsiList" id="disiplinDeskripsi" name="deskripsi" placeholder="Pilih atau ketik pelanggaran baru" required>
-                            <datalist id="deskripsiList"></datalist>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="disiplinCatatan">Catatan Tambahan dari Guru</label>
-                        <textarea id="disiplinCatatan" name="catatan" rows="3"></textarea>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-accent">Kumpulkan Catatan</button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="card" style="margin-top: 2rem;">
-                 <div class="card-header">Riwayat Kedisiplinan Siswa</div>
-                 <div class="form-grid">
-                    <div class="form-group">
-                        <label for="searchDisiplinNisn">Cari berdasarkan NISN</label>
-                        <input type="number" id="searchDisiplinNisn" placeholder="Masukkan NISN siswa...">
-                    </div>
-                    <div class="form-group" style="align-self: end;">
-                        <button type="button" id="searchDisiplinButton" class="btn btn-primary">Cari Riwayat</button>
-                        <button type="button" id="exportDisiplinButton" class="btn btn-success" style="margin-left: 10px; display: none;">Export ke Excel</button>
-                    </div>
-                 </div>
-                 <div class="table-container" style="margin-top: 1.5rem;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Tanggal</th>
-                                <th>Tingkat</th>
-                                <th>Deskripsi Pelanggaran</th>
-                                <th>Catatan Guru</th>
-                            </tr>
-                        </thead>
-                        <tbody id="disiplinHistoryTableBody"></tbody>
-                    </table>
-                 </div>
-            </div>
-        </div>
-
-        <!-- ====================================================== -->
-        <!-- Bagian 5: MANAJEMEN SISWA                              -->
+        <!-- Bagian 4: MANAJEMEN SISWA                              -->
         <!-- ====================================================== -->
         <div id="siswaSection" class="content-section" style="display: none;">
             <div class="card">
@@ -198,7 +132,7 @@
         </div>
 
         <!-- ====================================================== -->
-        <!-- Bagian 6: MANAJEMEN PENGGUNA                           -->
+        <!-- Bagian 5: MANAJEMEN PENGGUNA                           -->
         <!-- ====================================================== -->
         <div id="penggunaSection" class="content-section" style="display: none;">
             <div class="card">
@@ -224,6 +158,66 @@
                 </div>
             </div>
         </div>
+
+        <!-- [PERUBAHAN] Menambahkan seluruh bagian HTML baru untuk halaman Kedisiplinan -->
+        <!-- ====================================================== -->
+        <!-- Bagian 6: CATATAN KEDISIPLINAN                         -->
+        <!-- ====================================================== -->
+        <div id="disiplinSection" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header">Input Catatan Kedisiplinan Siswa</div>
+                <form id="formDisiplin">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="disiplinNisn">NISN Siswa</label>
+                            <input type="number" id="disiplinNisn" placeholder="Ketik NISN, lalu tekan Enter/Tab" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nama Siswa (Otomatis)</label>
+                            <input type="text" id="disiplinNama" readonly style="background-color: #e9ecef;">
+                        </div>
+                        <div class="form-group">
+                            <label for="disiplinTanggal">Tanggal Kejadian</label>
+                            <input type="date" id="disiplinTanggal" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="disiplinTingkat">Tingkat Pelanggaran</label>
+                            <input type="text" id="disiplinTingkat" list="tingkatList" placeholder="Ketik atau pilih tingkat" required>
+                            <datalist id="tingkatList"></datalist>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="disiplinPelanggaran">Detail Pelanggaran</label>
+                        <input type="text" id="disiplinPelanggaran" list="pelanggaranList" placeholder="Pilih dari daftar atau ketik baru" required>
+                        <datalist id="pelanggaranList"></datalist>
+                    </div>
+                    <div class="form-actions" style="margin-top: 2rem;">
+                        <button type="submit" id="submitDisiplinButton" class="btn btn-danger">Kumpulkan Catatan</button>
+                        <button type="button" id="exportDisiplinButton" class="btn btn-success" style="margin-left: 10px; display: none;">Export Hasil Pencarian</button>
+                    </div>
+                </form>
+            </div>
+    
+            <div class="card" style="margin-top: 2rem;">
+                <div class="card-header">Riwayat Pelanggaran Siswa</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="searchDisiplinNisn">Cari Riwayat berdasarkan NISN</label>
+                        <input type="number" id="searchDisiplinNisn" placeholder="Masukkan NISN dan tekan tombol Cari">
+                    </div>
+                    <div class="form-group" style="align-self: end;">
+                        <button type="button" id="searchDisiplinButton" class="btn btn-secondary">Cari Riwayat</button>
+                    </div>
+                </div>
+                <div class="table-container" style="margin-top: 1.5rem;">
+                    <table>
+                        <thead><tr><th>Tanggal</th><th>Tingkat</th><th>Pelanggaran</th><th>Pencatat</th></tr></thead>
+                        <tbody id="riwayatDisiplinTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- ====================================================== -->
@@ -243,9 +237,16 @@
     <!-- JAVASCRIPT LIBRARIES & SCRIPT UTAMA                    -->
     <!-- ====================================================== -->
     
+    <!-- Library untuk Scan QR Code -->
     <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
+    
+    <!-- Library untuk Generate QR Code -->
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    
+    <!-- Library untuk Export ke Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Script Utama Aplikasi -->
     <script src="app.js"></script>
 </body>
 </html>
