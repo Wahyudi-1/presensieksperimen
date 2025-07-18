@@ -158,6 +158,13 @@ main.container {
     max-width: 350px;
 }
 
+.responsive-icon {
+    max-width: 150px; 
+    width: 100%;      
+    height: auto;
+    display: block;
+}
+
 /* -----------------------------------------------------------------
    4. KOMPONEN UMUM (KARTU, FORM, TOMBOL, TABEL)
    ----------------------------------------------------------------- */
@@ -388,3 +395,4 @@ tbody tr:hover { background-color: var(--secondary-color); }
         color: var(--text-color);
     }
 }
+
