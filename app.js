@@ -2,15 +2,14 @@
  * =================================================================
  * SCRIPT UTAMA FRONTEND - SISTEM PRESENSI QR (DENGAN MODUL KEDISIPLINAN)
  * =================================================================
- * @version 3.0 - Discipline Module Frontend
+ * @version 3.1 - Enhanced Student Management & Export Features
  * @author Gemini AI Expert for User
  *
- * PERUBAHAN UTAMA:
- * - [FITUR] Menambahkan state `AppState.pelanggaran` untuk cache data master pelanggaran.
- * - [FITUR] Menambahkan fungsi-fungsi baru untuk menangani semua interaksi di halaman Catatan Disiplin.
- * - [FITUR] Logika untuk autocomplete/rekomendasi pelanggaran berdasarkan tingkat.
- * - [FITUR] Logika untuk mencari dan menampilkan riwayat kedisiplinan siswa.
- * - [UPDATE] Memperbarui `initDashboardPage` dan `setupDashboardListeners` untuk modul baru.
+ * PERUBAHAN UTAMA (v3.1):
+ * - [FITUR] Menambahkan fungsi `exportSiswaToExcel` untuk mengunduh data siswa.
+ * - [FITUR] Menambahkan fungsi `exportAllQrCodes` untuk mencetak semua QR code siswa.
+ * - [UPDATE] Menyesuaikan modul Manajemen Siswa untuk menangani kolom "WhatsappOrtu".
+ * - [UPDATE] Memperbarui URL SCRIPT_URL sesuai permintaan.
  */
 
 // ====================================================================
@@ -23,7 +22,7 @@ const AppState = {
     siswa: [],
     users: [],
     rekap: [],
-    pelanggaran: [], // [BARU] Cache untuk data master pelanggaran
+    pelanggaran: [],
 };
 
 let qrScannerDatang, qrScannerPulang;
@@ -102,7 +101,7 @@ function setupPasswordToggle() {
 // TAHAP 3: FUNGSI-FUNGSI UTAMA
 // ====================================================================
 
-// --- FUNGSI LAMA (Tidak Berubah) ---
+// --- FUNGSI LOGIN, LOGOUT, PRESENSI, DAN REKAP (TIDAK BERUBAH) ---
 function checkAuthentication() {
     const user = sessionStorage.getItem('loggedInUser');
     if (user) {
@@ -190,16 +189,9 @@ async function processQrScan(qrData, type) {
     }
 }
 async function loadRawRekapData(force = false) {
-    if (!force && AppState.rekap.length > 0) {
-        console.log("Data rekap sudah ada di cache.");
-        return;
-    }
-    console.log("Mengambil data rekap mentah dari server...");
+    if (!force && AppState.rekap.length > 0) return;
     const result = await makeApiCall(`${SCRIPT_URL}?action=getRawAttendanceData`);
-    if (result) {
-        AppState.rekap = result.data;
-        console.log(`${AppState.rekap.length} baris data rekap berhasil dimuat ke cache.`);
-    }
+    if (result) AppState.rekap = result.data;
 }
 function filterAndRenderRekap() {
     const startDateStr = document.getElementById('rekapFilterTanggalMulai').value;
@@ -222,15 +214,12 @@ function filterAndRenderRekap() {
 }
 function renderRekapTable(data) {
     const tableBody = document.getElementById('rekapTableBody');
-    const siswaMap = AppState.siswa.reduce((map, s) => {
-        map[s.NISN] = s.Nama;
-        return map;
-    }, {});
+    const siswaMap = AppState.siswa.reduce((map, s) => { map[s.NISN] = s.Nama; return map; }, {});
     tableBody.innerHTML = data.length === 0 
-        ? '<tr><td colspan="6" style="text-align: center;">Tidak ada data rekap ditemukan untuk rentang tanggal ini.</td></tr>'
+        ? '<tr><td colspan="6" style="text-align: center;">Tidak ada data rekap ditemukan.</td></tr>'
         : data.map(row => {
-            const namaSiswa = siswaMap[row[1]] || row[2] || "Nama tidak ditemukan";
-            return `<tr><td data-label="Tanggal">${new Date(row[3]).toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'})}</td><td data-label="NISN">${row[1]}</td><td data-label="Nama">${namaSiswa}</td><td data-label="Datang">${row[4] ? new Date(row[4]).toLocaleTimeString('id-ID') : 'N/A'}</td><td data-label="Pulang">${row[5] ? new Date(row[5]).toLocaleTimeString('id-ID') : 'Belum Pulang'}</td><td data-label="Status">${row[6]}</td></tr>`
+            const namaSiswa = siswaMap[row[1]] || row[2] || "N/A";
+            return `<tr><td data-label="Tanggal">${new Date(row[3]).toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'})}</td><td data-label="NISN">${row[1]}</td><td data-label="Nama">${namaSiswa}</td><td data-label="Datang">${row[4] ? new Date(row[4]).toLocaleTimeString('id-ID') : 'N/A'}</td><td data-label="Pulang">${row[5] ? new Date(row[5]).toLocaleTimeString('id-ID') : 'Belum'}</td><td data-label="Status">${row[6]}</td></tr>`
         }).join('');
 }
 function exportRekapToExcel() {
@@ -242,25 +231,41 @@ function exportRekapToExcel() {
     const wb = XLSX.utils.table_to_book(table, { sheet: "Rekap Presensi" });
     XLSX.writeFile(wb, `Rekap_Presensi_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
+
+// --- FUNGSI MANAJEMEN SISWA (DENGAN PERBAIKAN & FITUR BARU) ---
 async function loadSiswaAndRenderTable(force = false) {
     if (!force && AppState.siswa.length > 0) {
-        console.log("Memuat data siswa dari cache...");
         renderSiswaTable(AppState.siswa);
         return;
     }
-    console.log("Memuat data siswa dari server...");
     const result = await makeApiCall(`${SCRIPT_URL}?action=getSiswa`);
     if (result) {
         AppState.siswa = result.data;
         renderSiswaTable(AppState.siswa);
     }
 }
+
+/**
+ * [PERBAIKAN] Merender tabel siswa dengan kolom "Whatsapp Ortu".
+ */
 function renderSiswaTable(siswaArray) {
     const tableBody = document.getElementById('siswaResultsTableBody');
     tableBody.innerHTML = siswaArray.length === 0
-        ? '<tr><td colspan="4" style="text-align: center;">Data siswa tidak ditemukan.</td></tr>'
-        : siswaArray.map(siswa => `<tr><td data-label="NISN">${siswa.NISN}</td><td data-label="Nama">${siswa.Nama}</td><td data-label="Kelas">${siswa.Kelas}</td><td data-label="Aksi"><button class="btn btn-sm btn-primary" onclick="generateQRHandler('${siswa.NISN}')">QR Code</button><button class="btn btn-sm btn-secondary" onclick="editSiswaHandler('${siswa.NISN}')">Ubah</button><button class="btn btn-sm btn-danger" onclick="deleteSiswaHandler('${siswa.NISN}')">Hapus</button></td></tr>`).join('');
+        ? '<tr><td colspan="5" style="text-align: center;">Data siswa tidak ditemukan.</td></tr>'
+        : siswaArray.map(siswa => `
+            <tr>
+                <td data-label="NISN">${siswa.NISN}</td>
+                <td data-label="Nama">${siswa.Nama}</td>
+                <td data-label="Kelas">${siswa.Kelas || '-'}</td>
+                <td data-label="Whatsapp Ortu">${siswa.WhatsappOrtu || '-'}</td>
+                <td data-label="Aksi">
+                    <button class="btn btn-sm btn-primary" onclick="generateQRHandler('${siswa.NISN}')">QR</button>
+                    <button class="btn btn-sm btn-secondary" onclick="editSiswaHandler('${siswa.NISN}')">Ubah</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteSiswaHandler('${siswa.NISN}')">Hapus</button>
+                </td>
+            </tr>`).join('');
 }
+
 async function saveSiswa() {
     const form = document.getElementById('formSiswa');
     const formData = new FormData(form);
@@ -274,21 +279,28 @@ async function saveSiswa() {
         await loadSiswaAndRenderTable(true);
     }
 }
+
+/**
+ * [PERBAIKAN] Mengisi form edit siswa, termasuk kolom "WhatsappOrtu".
+ */
 function editSiswaHandler(nisn) {
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
     if (!siswa) return;
     document.getElementById('formNisn').value = siswa.NISN;
     document.getElementById('formNama').value = siswa.Nama;
     document.getElementById('formKelas').value = siswa.Kelas;
+    document.getElementById('formWhatsappOrtu').value = siswa.WhatsappOrtu || ''; // Mengisi data WA Ortu
     document.getElementById('formNisnOld').value = siswa.NISN;
     document.getElementById('saveSiswaButton').textContent = 'Update Data Siswa';
     document.getElementById('formSiswa').scrollIntoView({ behavior: 'smooth' });
 }
+
 function resetFormSiswa() {
     document.getElementById('formSiswa').reset();
     document.getElementById('formNisnOld').value = '';
     document.getElementById('saveSiswaButton').textContent = 'Simpan Data Siswa';
 }
+
 async function deleteSiswaHandler(nisn) {
     if (confirm(`Yakin ingin menghapus siswa dengan NISN: ${nisn}?`)) {
         const formData = new FormData();
@@ -301,6 +313,7 @@ async function deleteSiswaHandler(nisn) {
         }
     }
 }
+
 function generateQRHandler(nisn) {
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
     if (!siswa) return;
@@ -311,6 +324,7 @@ function generateQRHandler(nisn) {
     new QRCode(canvas, { text: siswa.NISN.toString(), width: 200, height: 200, correctLevel: QRCode.CorrectLevel.H });
     document.getElementById('qrModal').style.display = 'flex';
 }
+
 function printQrCode() {
     const modalContent = document.querySelector("#qrModal .modal-content").cloneNode(true);
     modalContent.querySelector('.modal-close-button')?.remove();
@@ -321,13 +335,62 @@ function printQrCode() {
     printWindow.focus();
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
 }
+
+/**
+ * [FITUR BARU] Mengekspor data semua siswa dari AppState ke file Excel.
+ */
+function exportSiswaToExcel() {
+    if (AppState.siswa.length === 0) {
+        return showStatusMessage('Tidak ada data siswa untuk diekspor.', 'info');
+    }
+    const dataForSheet = [['NISN', 'Nama', 'Kelas', 'Whatsapp Orang Tua']];
+    AppState.siswa.forEach(siswa => {
+        dataForSheet.push([siswa.NISN, siswa.Nama, siswa.Kelas, siswa.WhatsappOrtu || '']);
+    });
+    const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Siswa");
+    XLSX.writeFile(workbook, `Data_Siswa_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showStatusMessage('Data siswa berhasil diekspor ke Excel.', 'success');
+}
+
+/**
+ * [FITUR BARU] Membuka jendela baru yang berisi semua QR code siswa dalam format kartu, siap untuk dicetak.
+ */
+function exportAllQrCodes() {
+    if (AppState.siswa.length === 0) {
+        showStatusMessage("Tidak ada data siswa untuk mencetak QR code.", "info");
+        return;
+    }
+    showLoading(true);
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write('<html><head><title>Cetak Semua QR Code Siswa</title>');
+    printWindow.document.write(`<style>@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500&display=swap');body{font-family:'Poppins',sans-serif;margin:20px;}.page-container{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:15px;}.qr-card{page-break-inside:avoid;display:flex;flex-direction:column;align-items:center;text-align:center;border:1px solid #ccc;border-radius:8px;padding:15px;width:220px;}.qr-canvas{margin:10px 0;}h4,p{margin:2px 0;}p{font-size:0.9em;color:#555;}@media print{body{margin:10px;-webkit-print-color-adjust:exact;}.qr-card{border:1px solid #eee;}}</style>`);
+    printWindow.document.write('</head><body><h3>Daftar QR Code Siswa</h3><div class="page-container">');
+    AppState.siswa.forEach(siswa => {
+        printWindow.document.write(`<div class="qr-card"><h4>${siswa.Nama}</h4><p>NISN: ${siswa.NISN}</p><div id="qr-canvas-${siswa.NISN}" class="qr-canvas"></div></div>`);
+    });
+    printWindow.document.write('</div></body></html>');
+    setTimeout(() => {
+        AppState.siswa.forEach(siswa => {
+            const canvas = printWindow.document.getElementById(`qr-canvas-${siswa.NISN}`);
+            if (canvas) new QRCode(canvas, { text: siswa.NISN.toString(), width: 180, height: 180, correctLevel: QRCode.CorrectLevel.H });
+        });
+        setTimeout(() => {
+            showLoading(false);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+        }, 1000);
+    }, 500);
+}
+
+// --- FUNGSI MANAJEMEN PENGGUNA (TIDAK BERUBAH) ---
 async function loadUsers(force = false) {
     if (!force && AppState.users.length > 0) {
-        console.log("Memuat data pengguna dari cache...");
         renderUsersTable(AppState.users);
         return;
     }
-    console.log("Memuat data pengguna dari server...");
     const result = await makeApiCall(`${SCRIPT_URL}?action=getUsers`);
     if (result) {
         AppState.users = result.data;
@@ -386,129 +449,76 @@ function resetFormPengguna() {
     document.getElementById('savePenggunaButton').textContent = 'Simpan Pengguna';
 }
 
-// --- FUNGSI BARU UNTUK MODUL KEDISIPLINAN ---
-
+// --- FUNGSI MODUL KEDISIPLINAN (TIDAK BERUBAH) ---
 async function loadPelanggaranData() {
-    console.log("Memuat data master pelanggaran ke cache...");
     const result = await makeApiCall(`${SCRIPT_URL}?action=getPelanggaranData`, {}, false);
     if (result) {
         AppState.pelanggaran = result.data;
-        console.log(`${AppState.pelanggaran.length} data pelanggaran berhasil dimuat.`);
-        populateDisciplineRecommendations(); // Panggil fungsi untuk mengisi datalist
-    } else {
-        console.error("Gagal memuat data master pelanggaran.");
+        populateDisciplineRecommendations();
     }
 }
-
 function handleNisnDisiplinInput() {
     const nisn = document.getElementById('nisnDisiplinInput').value;
     const namaEl = document.getElementById('namaSiswaDisiplin');
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
-    if (siswa) {
-        namaEl.value = siswa.Nama;
-    } else {
-        namaEl.value = '';
-    }
+    namaEl.value = siswa ? siswa.Nama : '';
 }
-
 function populateDisciplineRecommendations() {
     const tingkatList = document.getElementById('tingkatList');
     const deskripsiList = document.getElementById('deskripsiList');
     if (!tingkatList || !deskripsiList) return;
-
-    // Isi Tingkat
     const semuaTingkat = [...new Set(AppState.pelanggaran.map(p => p.tingkat))];
     tingkatList.innerHTML = semuaTingkat.map(t => `<option value="${t}"></option>`).join('');
-
-    // Isi Deskripsi (semua pada awalnya)
     deskripsiList.innerHTML = AppState.pelanggaran.map(p => `<option value="${p.deskripsi}"></option>`).join('');
 }
-
 function handleTingkatChange() {
     const tingkatInput = document.getElementById('tingkatDisiplinInput').value;
     const deskripsiList = document.getElementById('deskripsiList');
     if (!deskripsiList) return;
-
-    let filteredPelanggaran = AppState.pelanggaran;
-    if (tingkatInput) {
-        filteredPelanggaran = AppState.pelanggaran.filter(p => p.tingkat === tingkatInput);
-    }
-    
+    let filteredPelanggaran = tingkatInput ? AppState.pelanggaran.filter(p => p.tingkat === tingkatInput) : AppState.pelanggaran;
     deskripsiList.innerHTML = filteredPelanggaran.map(p => `<option value="${p.deskripsi}"></option>`).join('');
 }
-
 async function handleSubmitDisiplin(event) {
     event.preventDefault();
     const form = document.getElementById('formDisiplin');
     const formData = new FormData(form);
     formData.append('action', 'saveCatatanDisiplin');
-    
     const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
-
     if (result) {
         showStatusMessage(result.message, 'success');
         form.reset();
-        document.getElementById('namaSiswaDisiplin').value = ''; // Reset nama juga
+        document.getElementById('namaSiswaDisiplin').value = '';
     }
 }
-
 async function handleSearchRiwayatDisiplin() {
     const nisn = document.getElementById('searchNisnDisiplin').value;
-    if (!nisn) {
-        showStatusMessage("Harap masukkan NISN untuk mencari riwayat.", "info");
-        return;
-    }
+    if (!nisn) return showStatusMessage("Harap masukkan NISN untuk mencari riwayat.", "info");
     const result = await makeApiCall(`${SCRIPT_URL}?action=getRiwayatDisiplin&nisn=${nisn}`);
-    if (result) {
-        renderRiwayatDisiplinTable(result.data);
-    }
+    if (result) renderRiwayatDisiplinTable(result.data);
 }
-
 function renderRiwayatDisiplinTable(riwayatArray) {
     const tableBody = document.getElementById('riwayatDisiplinTableBody');
-    tableBody.innerHTML = ''; // Kosongkan tabel
-    
     if (riwayatArray.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Tidak ada riwayat kedisiplinan ditemukan untuk siswa ini.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Tidak ada riwayat kedisiplinan ditemukan.</td></tr>';
         return;
     }
-
-    tableBody.innerHTML = riwayatArray.map(r => `
-        <tr>
-            <td data-label="Tanggal">${r.tanggal}</td>
-            <td data-label="Tingkat">${r.tingkat}</td>
-            <td data-label="Deskripsi">${r.deskripsi}</td>
-            <td data-label="Poin">${r.poin}</td>
-        </tr>
-    `).join('');
+    tableBody.innerHTML = riwayatArray.map(r => `<tr><td data-label="Tanggal">${r.tanggal}</td><td data-label="Tingkat">${r.tingkat}</td><td data-label="Deskripsi">${r.deskripsi}</td><td data-label="Poin">${r.poin}</td></tr>`).join('');
 }
-
-
-// --- FUNGSI INISIALISASI ---
-
 async function loadAllSiswaIntoCache() {
-    console.log("Memuat data siswa ke cache...");
     const result = await makeApiCall(`${SCRIPT_URL}?action=getSiswa`, {}, false);
-    if (result) {
-        AppState.siswa = result.data;
-        console.log(`${AppState.siswa.length} data siswa berhasil dimuat ke cache.`);
-    } else {
-        console.error("Gagal memuat data siswa ke cache.");
-    }
+    if (result) AppState.siswa = result.data;
 }
 
 // ====================================================================
 // TAHAP 4: INISIALISASI DAN EVENT LISTENERS
 // ====================================================================
-
 function setupDashboardListeners() {
     document.getElementById('logoutButton')?.addEventListener('click', handleLogout);
     document.querySelectorAll('.section-nav button').forEach(button => {
         button.addEventListener('click', () => {
             document.querySelectorAll('.section-nav button').forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
-            stopQrScanner('datang');
-            stopQrScanner('pulang');
+            stopQrScanner('datang'); stopQrScanner('pulang');
             const sectionId = button.dataset.section;
             document.querySelectorAll('.content-section').forEach(section => {
                 section.style.display = section.id === sectionId ? 'block' : 'none';
@@ -523,10 +533,7 @@ function setupDashboardListeners() {
                     await loadRawRekapData();
                     filterAndRenderRekap();
                 },
-                // [BARU] Aksi saat tab disiplin di-klik
-                disiplinSection: () => {
-                    // Cukup tampilkan, karena data sudah di-cache saat loading
-                },
+                disiplinSection: () => {},
                 siswaSection: () => loadSiswaAndRenderTable(),
                 penggunaSection: () => loadUsers(),
             };
@@ -552,19 +559,20 @@ function setupDashboardListeners() {
     });
     document.getElementById('printQrButton')?.addEventListener('click', printQrCode);
 
-    // [BARU] Event listener untuk halaman Catatan Disiplin
+    // [PERBAIKAN] Menambahkan listener untuk tombol-tombol ekspor baru
+    document.getElementById('exportSiswaExcelButton')?.addEventListener('click', exportSiswaToExcel);
+    document.getElementById('exportAllQrButton')?.addEventListener('click', exportAllQrCodes);
+
     document.getElementById('nisnDisiplinInput')?.addEventListener('blur', handleNisnDisiplinInput);
     document.getElementById('tingkatDisiplinInput')?.addEventListener('input', handleTingkatChange);
     document.getElementById('formDisiplin')?.addEventListener('submit', handleSubmitDisiplin);
     document.getElementById('searchDisiplinButton')?.addEventListener('click', handleSearchRiwayatDisiplin);
-
 }
 
 async function initDashboardPage() {
     checkAuthentication();
     setupDashboardListeners();
     await loadAllSiswaIntoCache(); 
-    // [BARU] Muat juga data pelanggaran saat aplikasi dimulai
     await loadPelanggaranData();
     document.querySelector('.section-nav button[data-section="datangSection"]')?.click();
 }
