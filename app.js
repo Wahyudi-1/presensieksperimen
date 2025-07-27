@@ -757,10 +757,16 @@ function setupDashboardListeners() {
                 section.style.display = section.id === sectionId ? 'block' : 'none';
             });
             const actions = {
-                datangSection: () => startQrScanner('datang'),
-                loadAndRenderDailyLog('datang');
-                pulangSection: () => startQrScanner('pulang'),
-                loadAndRenderDailyLog('pulang');
+                // PERBAIKAN DI SINI
+                datangSection: () => {
+                    startQrScanner('datang');
+                    loadAndRenderDailyLog('datang');
+                },
+                // DAN DI SINI
+                pulangSection: () => {
+                    startQrScanner('pulang');
+                    loadAndRenderDailyLog('pulang');
+                },
                 rekapSection: () => {
                     const today = new Date().toISOString().slice(0, 10);
                     document.getElementById('rekapFilterTanggalMulai').value = today;
@@ -769,7 +775,6 @@ function setupDashboardListeners() {
                 },
                 disiplinSection: () => {},
                 siswaSection: () => loadSiswaAndRenderTable(),
-                // penggunaSection: () => loadUsers(),
             };
             actions[sectionId]?.();
         });
