@@ -2,13 +2,12 @@
  * =================================================================
  * SCRIPT UTAMA FRONTEND - SISTEM PRESENSI QR (DENGAN MODUL KEDISIPLINAN)
  * =================================================================
- * @version 4.1 - Password Recovery Flow
+ * @version 4.2 - Forgot Password Implementation
  * @author Gemini AI Expert for User
  *
- * PERUBAHAN UTAMA (v4.1):
- * - [FITUR] Menambahkan fungsi `setupAuthListener` untuk menangani event otentikasi dari Supabase.
- * - [FITUR] Mengimplementasikan alur untuk menampilkan form reset password saat pengguna datang dari link recovery.
- * - [UPDATE] Memanggil `setupAuthListener` pada inisialisasi halaman.
+ * PERUBAHAN UTAMA (v4.2):
+ * - [FITUR] Menambahkan fungsi `handleForgotPassword` untuk mengirim email recovery.
+ * - [UPDATE] Menambahkan event listener untuk link "Lupa Password?" pada halaman login.
  */
 
 // ====================================================================
@@ -16,7 +15,6 @@
 // ====================================================================
 
 // --- Inisialisasi Klien Supabase ---
-// Ganti dengan URL dan Kunci Anon dari dashboard Supabase Anda.
 const SUPABASE_URL = 'https://vxuejzlfyxykebfawhujh.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4';
 
@@ -100,7 +98,6 @@ async function checkAuthenticationAndSetup() {
         return;
     }
     if (session && window.location.pathname.includes('index.html') && !session.user.user_metadata.is_password_recovery) {
-        // Cek tambahan agar tidak redirect saat proses recovery password
         window.location.href = 'dashboard.html';
         return;
     }
@@ -113,9 +110,6 @@ async function checkAuthenticationAndSetup() {
     }
 }
 
-/**
- * [BARU] Listener untuk menangani semua event otentikasi, termasuk reset password.
- */
 function setupAuthListener() {
     supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
@@ -127,7 +121,7 @@ function setupAuthListener() {
             resetContainer.style.display = 'grid';
             
             const resetForm = document.getElementById('resetPasswordForm');
-            resetForm.onsubmit = async (e) => { // Menggunakan onsubmit untuk mencegah listener ganda
+            resetForm.onsubmit = async (e) => {
                 e.preventDefault();
                 const newPassword = document.getElementById('newPassword').value;
                 if (!newPassword || newPassword.length < 6) {
@@ -184,6 +178,33 @@ async function handleLogout() {
             window.location.href = 'index.html';
         }
     }
+}
+
+/**
+ * [BARU] Menangani permintaan reset password dari pengguna.
+ */
+async function handleForgotPassword() {
+    const emailEl = document.getElementById('username');
+    const email = emailEl.value;
+
+    if (!email) {
+        return showStatusMessage('Silakan masukkan alamat email Anda terlebih dahulu, lalu klik "Lupa Password?".', 'error');
+    }
+
+    if (!confirm(`Anda akan mengirimkan link reset password ke alamat: ${email}. Lanjutkan?`)) {
+        return;
+    }
+
+    showLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href.split('#')[0],
+    });
+    showLoading(false);
+
+    if (error) {
+        return showStatusMessage(`Gagal mengirim email: ${error.message}`, 'error');
+    }
+    showStatusMessage('Email untuk reset password telah dikirim! Silakan periksa kotak masuk (dan folder spam) Anda.', 'success');
 }
 
 
@@ -689,6 +710,10 @@ async function initLoginPage() {
     await checkAuthenticationAndSetup();
     setupAuthListener();
     setupPasswordToggle();
+    document.getElementById('forgotPasswordLink')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleForgotPassword();
+    });
 }
 
 // ====================================================================
