@@ -14,7 +14,7 @@
 // ====================================================================
 
 // --- Inisialisasi Klien Supabase ---
-const SUPABASE_URL = 'https://vxuejzlfyxykebfawhujh.supabase.co'; 
+const SUPABASE_URL = 'https://vxuejzlfxykebfawhujh.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4';
 
 // ========== PERBAIKAN FINAL DAN DIJAMIN BERHASIL ==========
