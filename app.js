@@ -96,25 +96,38 @@ function setupPasswordToggle() {
 // ====================================================================
 
 // --- FUNGSI OTENTIKASI & MANAJEMEN SESI ---
-async function checkAuthenticationAndSetup() {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session && window.location.pathname.includes('dashboard.html')) {
-        window.location.href = 'index.html';
-        return;
-    }
-    if (session && window.location.pathname.includes('index.html') && !session.user.user_metadata.is_password_recovery) {
-        window.location.href = 'dashboard.html';
-        return;
-    }
+// Ganti seluruh fungsi checkAuthenticationAndSetup dengan ini:
 
-    if (session) {
-        const welcomeEl = document.getElementById('welcomeMessage');
-        if (welcomeEl) {
-             welcomeEl.textContent = `Selamat Datang, ${session.user.email}!`;
+    async function checkAuthenticationAndSetup() {
+        // Cek apakah URL berisi hash untuk pemulihan password
+        const isPasswordRecovery = window.location.hash.includes('type=recovery');
+    
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        // Logika Pengalihan Halaman (Diperbaiki)
+        if (!session && window.location.pathname.includes('dashboard.html')) {
+            // Jika tidak ada sesi DAN ada di dashboard, tendang ke login
+            window.location.href = 'index.html';
+            return;
+        }
+    
+        if (session && window.location.pathname.includes('index.html')) {
+            // Kondisi baru:
+            // HANYA redirect ke dashboard jika ini BUKAN proses recovery password
+            if (!isPasswordRecovery) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+        }
+    
+        if (session) {
+            // Kode ini tetap berjalan untuk menampilkan pesan selamat datang di dashboard
+            const welcomeEl = document.getElementById('welcomeMessage');
+            if (welcomeEl) {
+                 welcomeEl.textContent = `Selamat Datang, ${session.user.email}!`;
+            }
         }
     }
-}
 
 function setupAuthListener() {
     supabase.auth.onAuthStateChange((event, session) => {
