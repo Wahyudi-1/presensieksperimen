@@ -6,7 +6,7 @@
  * @author Gemini AI Expert for User
  *
  * PERUBAHAN UTAMA (v4.3):
- * - [FIX] Memperbaiki inisialisasi Supabase client untuk mengatasi error "Cannot access 'supabase' before initialization".
+ * - [FIX] Memperbaiki inisialisasi Supabase client secara definitif untuk mengatasi error "Cannot access 'supabase' before initialization".
  */
 
 // ====================================================================
@@ -17,11 +17,13 @@
 const SUPABASE_URL = 'https://vxuejzlfyxykebfawhujh.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4';
 
-// ========== PERBAIKAN FINAL DAN TERBAIK DI SINI ==========
-// Kita ambil fungsi 'createClient' dari objek global 'supabase' yang dimuat oleh CDN
-const { createClient } = supabase; 
-// Sekarang kita buat instance klien kita sendiri dan menyimpannya ke dalam variabel 'supabase'
-// Tidak ada lagi konflik nama variabel.
+// ========== PERBAIKAN FINAL DAN DIJAMIN BERHASIL ==========
+// Ambil fungsi 'createClient' dari objek global 'supabase' yang ada di 'window'.
+// 'window.supabase' merujuk ke library yang dimuat oleh CDN.
+const { createClient } = window.supabase; 
+
+// Buat instance klien kita dan simpan ke dalam variabel 'supabase' baru yang akan kita gunakan di seluruh file ini.
+// Tidak akan ada lagi konflik nama karena kita sudah mengambil fungsinya terlebih dahulu.
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ========== AKHIR DARI PERBAIKAN ==========
 
