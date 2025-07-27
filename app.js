@@ -15,10 +15,14 @@
 // ====================================================================
 
 // --- Inisialisasi Klien Supabase ---
+// Ganti dengan URL dan Kunci Anon dari dashboard Supabase Anda.
 const SUPABASE_URL = 'https://vxuejzlfyxykebfawhujh.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4';
 
+// PERBAIKAN: Panggil .createClient dari objek global supabase yang disediakan oleh library via CDN
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Untuk konsistensi dengan sisa kode, kita akan gunakan nama variabel 'supabase'
 const supabase = supabaseClient;
 
 // --- State Aplikasi ---
