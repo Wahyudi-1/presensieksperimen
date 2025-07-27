@@ -63,38 +63,57 @@
                 <h2 class="logo">Sekolah</h2>
                 <p style="color: var(--text-light); margin-bottom: 25px;">Silakan masuk untuk melanjutkan.</p>
                 
-                <!-- Form dibuat agar submit dengan tombol Enter juga berfungsi -->
                 <form onsubmit="event.preventDefault(); handleLogin();">
                     
-                    <!-- ========== PERUBAHAN DI SINI ========== -->
                     <div class="form-group">
                         <label for="username">Email</label>
                         <input type="email" id="username" placeholder="Masukkan alamat email Anda" required autocomplete="email">
                     </div>
-                    <!-- ========== AKHIR PERUBAHAN ========== -->
                     
-                    <!-- Wrapper untuk input password dan ikon toggle -->
                     <div class="form-group">
                         <label for="password">Password</label>
                         <div class="password-wrapper">
                             <input type="password" id="password" placeholder="Masukkan password Anda" required autocomplete="current-password">
-                            <!-- Ikon toggle akan di-generate oleh JavaScript -->
                             <span id="togglePassword" class="toggle-password-icon"></span>
                         </div>
                     </div>
                     
                     <div class="form-group" style="margin-top: 2rem;">
-                        <!-- Tombol Login utama. Tipe `submit` agar bisa di-trigger oleh Enter -->
                         <button type="submit" id="loginButton" class="btn btn-primary btn-block">Login</button>
                     </div>
                 </form>
                 
-                <!-- Elemen untuk menampilkan pesan status (error/sukses) -->
                 <div id="statusMessage" class="status-message" style="display: none; margin-top: 15px;"></div>
             </div>
         </div>
 
     </div> <!-- End of .login-box -->
+
+    <!-- ========================================================== -->
+    <!-- RESET PASSWORD CONTAINER (SEMBUNYI SECARA DEFAULT)         -->
+    <!-- ========================================================== -->
+    <div id="resetPasswordContainer" class="login-box" style="display: none;">
+        <div class="login-form-container" style="grid-column: 1 / -1;">
+            <div class="login-form-content">
+                
+                <h2 class="logo">Atur Password Baru</h2>
+                <p style="color: var(--text-light); margin-bottom: 25px;">Silakan masukkan password baru Anda.</p>
+                
+                <form id="resetPasswordForm">
+                    <div class="form-group">
+                        <label for="newPassword">Password Baru</label>
+                        <input type="password" id="newPassword" placeholder="Masukkan password baru (min. 6 karakter)" required>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 2rem;">
+                        <button type="submit" class="btn btn-primary btn-block">Simpan Password Baru</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Akhir dari Reset Password Container -->
+
 
     <!-- ========================================================== -->
     <!-- ELEMEN GLOBAL (LOADING OVERLAY)                            -->
@@ -105,13 +124,10 @@
 
     <!-- ========================================================== -->
     <!-- JAVASCRIPT LIBRARIES & SCRIPT                              -->
-    <!-- Ditempatkan di akhir body untuk rendering halaman yg lebih cepat -->
     <!-- ========================================================== -->
     
-    <!-- ========== PERUBAHAN DI SINI ========== -->
     <!-- Library untuk Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- ========== AKHIR PERUBAHAN ========== -->
 
     <!-- Script utama aplikasi -->
     <script src="app.js"></script>
