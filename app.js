@@ -303,6 +303,7 @@ async function processQrScan(nisn, type) {
             playSound('success');
             resultEl.className = 'scan-result success';
             resultEl.innerHTML = `<strong>Presensi Datang Berhasil!</strong><br>${siswa.nama} (${nisn}) - ${waktu}`;
+            loadAndRenderDailyLog('datang');
         }
 
     } else { // type 'pulang'
@@ -340,10 +341,60 @@ async function processQrScan(nisn, type) {
             playSound('success');
             resultEl.className = 'scan-result success';
             resultEl.innerHTML = `<strong>Presensi Pulang Berhasil!</strong><br>${siswa.nama} (${nisn}) - ${waktu}`;
+            loadAndRenderDailyLog('pulang');
         }
     }
 }
+/**
+ * [BARU] Memuat dan merender log presensi harian untuk tipe tertentu (datang/pulang).
+ * @param {'datang' | 'pulang'} type - Tipe log yang ingin ditampilkan.
+ */
+async function loadAndRenderDailyLog(type) {
+    const tableBodyId = type === 'datang' ? 'logTableBodyDatang' : 'logTableBodyPulang';
+    const tableBody = document.getElementById(tableBodyId);
+    if (!tableBody) return;
 
+    // Tentukan rentang waktu untuk hari ini
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Ambil data dari Supabase
+    const { data, error } = await supabase
+        .from('presensi')
+        .select('waktu_datang, waktu_pulang, siswa (nisn, nama)')
+        .gte('waktu_datang', today.toISOString())
+        .lt('waktu_datang', tomorrow.toISOString())
+        .order('waktu_datang', { ascending: false }); // Urutkan dari yang terbaru
+
+    if (error) {
+        console.error(`Gagal memuat log ${type}:`, error);
+        tableBody.innerHTML = `<tr><td colspan="3">Gagal memuat data.</td></tr>`;
+        return;
+    }
+
+    // Render tabel
+    tableBody.innerHTML = data.length === 0
+        ? `<tr><td colspan="3" style="text-align: center;">Belum ada data presensi hari ini.</td></tr>`
+        : data.map(row => {
+            // Tentukan waktu yang akan ditampilkan berdasarkan tipe log
+            const waktuTampil = type === 'datang' ? row.waktu_datang : row.waktu_pulang;
+            
+            // Jangan tampilkan baris di log 'pulang' jika siswa belum scan pulang
+            if (type === 'pulang' && !waktuTampil) {
+                return '';
+            }
+            
+            return `
+                <tr>
+                    <td>${new Date(waktuTampil).toLocaleTimeString('id-ID')}</td>
+                    <td>${row.siswa.nisn}</td>
+                    <td>${row.siswa.nama}</td>
+                </tr>
+            `;
+        }).join('');
+}
 
 // --- FUNGSI REKAP PRESENSI ---
 async function filterAndRenderRekap() {
@@ -707,7 +758,9 @@ function setupDashboardListeners() {
             });
             const actions = {
                 datangSection: () => startQrScanner('datang'),
+                loadAndRenderDailyLog('datang');
                 pulangSection: () => startQrScanner('pulang'),
+                loadAndRenderDailyLog('pulang');
                 rekapSection: () => {
                     const today = new Date().toISOString().slice(0, 10);
                     document.getElementById('rekapFilterTanggalMulai').value = today;
