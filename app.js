@@ -2,25 +2,32 @@
  * =================================================================
  * SCRIPT UTAMA FRONTEND - SISTEM PRESENSI QR (DENGAN MODUL KEDISIPLINAN)
  * =================================================================
- * @version 3.1 - Enhanced Student Management & Export Features
+ * @version 4.0 - Supabase Migration & CSV Import Feature
  * @author Gemini AI Expert for User
  *
- * PERUBAHAN UTAMA (v3.1):
- * - [FITUR] Menambahkan fungsi `exportSiswaToExcel` untuk mengunduh data siswa.
- * - [FITUR] Menambahkan fungsi `exportAllQrCodes` untuk mencetak semua QR code siswa.
- * - [UPDATE] Menyesuaikan modul Manajemen Siswa untuk menangani kolom "WhatsappOrtu".
- * - [UPDATE] Memperbarui URL SCRIPT_URL sesuai permintaan.
+ * PERUBAHAN UTAMA:
+ * - [MIGRASI] Mengganti semua panggilan ke Google Apps Script dengan Supabase SDK.
+ * - [MIGRASI] Mengimplementasikan sistem otentikasi Supabase.
+ * - [FITUR] Menambahkan fungsi untuk impor data Siswa & Pelanggaran dari file CSV via frontend.
+ * - [REFACTOR] Menyesuaikan semua fungsi CRUD (Create, Read, Update, Delete) untuk berinteraksi dengan Supabase.
  */
 
 // ====================================================================
 // TAHAP 1: KONFIGURASI GLOBAL DAN STATE APLIKASI
 // ====================================================================
 
-// const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyU6YGl9nyANKrqf9d9zzzTNYNll2KsIhR65KKBu_R0rpNTXAamsouM60GZZqAkyKnv/exec";
+// --- Inisialisasi Klien Supabase ---
+// Ganti dengan URL dan Kunci Anon dari dashboard Supabase Anda.
+const SUPABASE_URL = 'https://vxuejzlfxykebfawhujh.supabase.co'; 
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4';
 
-// TAMBAHKAN BLOK INI: GANTI DENGAN KUNCI ANDA SENDIRI
-const supabase = supabase.createClient('https://vxuejzlfxykebfawhujh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4');
+// PERBAIKAN DI SINI: Memanggil createClient dari objek global 'supabase' yang disediakan oleh library
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Untuk selanjutnya di dalam kode, kita akan memanggil 'supabaseClient'
+// Namun, agar tidak perlu mengubah sisa kode, kita akan menamainya 'supabase'
+const supabase = supabaseClient;
 
+// --- State Aplikasi ---
 const AppState = {
     siswa: [],
     users: [],
@@ -32,7 +39,7 @@ let qrScannerDatang, qrScannerPulang;
 let isScanning = { datang: false, pulang: false };
 
 // ====================================================================
-// TAHAP 2: FUNGSI-FUNGSI PEMBANTU (HELPERS) - TIDAK ADA PERUBAHAN BESAR
+// TAHAP 2: FUNGSI-FUNGSI PEMBANTU (HELPERS) - TIDAK ADA PERUBAHAN
 // ====================================================================
 
 function showLoading(isLoading) {
@@ -92,7 +99,6 @@ function setupPasswordToggle() {
 async function checkAuthenticationAndSetup() {
     const { data: { session } } = await supabase.auth.getSession();
     
-    // Logika Pengalihan Halaman
     if (!session && window.location.pathname.includes('dashboard.html')) {
         window.location.href = 'index.html';
         return;
@@ -103,14 +109,11 @@ async function checkAuthenticationAndSetup() {
     }
 
     if (session) {
-        // Ambil data profil (nama, peran) dari tabel 'profiles'
-        // Ini adalah contoh, Anda perlu membuat tabel 'profiles' dan mengisinya
-        // Untuk sementara, kita bisa gunakan email pengguna
         const welcomeEl = document.getElementById('welcomeMessage');
         if (welcomeEl) {
              welcomeEl.textContent = `Selamat Datang, ${session.user.email}!`;
         }
-        // TODO: Implementasikan pengambilan peran dari database untuk menyembunyikan menu admin.
+        // TODO: Implementasikan pengambilan peran dari tabel 'profiles' untuk menyembunyikan menu admin.
     }
 }
 
@@ -176,7 +179,6 @@ function stopQrScanner(type) {
 async function processQrScan(nisn, type) {
     const resultEl = document.getElementById(type === 'datang' ? 'scanResultDatang' : 'scanResultPulang');
     
-    // Validasi siswa ada di database
     const { data: siswa, error: siswaError } = await supabase
         .from('siswa')
         .select('nama')
@@ -219,7 +221,7 @@ async function processQrScan(nisn, type) {
             .eq('nisn_siswa', nisn)
             .gte('waktu_datang', today.toISOString())
             .lt('waktu_datang', tomorrow.toISOString())
-            .is('waktu_pulang', null); // Hanya update jika waktu pulang masih kosong
+            .is('waktu_pulang', null);
 
         if (error) {
             resultEl.className = 'scan-result error';
@@ -236,8 +238,6 @@ async function processQrScan(nisn, type) {
 
 
 // --- FUNGSI REKAP PRESENSI (REFACTORED) ---
-// Note: Rekap akan jauh lebih efisien jika dibuatkan 'view' atau 'function' di sisi database.
-// Untuk sekarang, kita lakukan di client-side.
 async function filterAndRenderRekap() {
     const startDateStr = document.getElementById('rekapFilterTanggalMulai').value;
     const endDateStr = document.getElementById('rekapFilterTanggalSelesai').value;
@@ -253,7 +253,7 @@ async function filterAndRenderRekap() {
             siswa ( nisn, nama )
         `)
         .gte('waktu_datang', startDateStr)
-        .lte('waktu_datang', `${endDateStr}T23:59:59`); // Sertakan seluruh hari di tanggal akhir
+        .lte('waktu_datang', `${endDateStr}T23:59:59`);
 
     showLoading(false);
     if (error) {
@@ -282,7 +282,6 @@ function renderRekapTable(data) {
 }
 
 function exportRekapToExcel() {
-    // Fungsi ini tidak perlu diubah karena bekerja pada tabel HTML
     const tableBody = document.getElementById('rekapTableBody');
     if (tableBody.rows.length === 0 || (tableBody.rows.length === 1 && tableBody.rows[0].cells.length === 1)) {
          return showStatusMessage('Tidak ada data untuk diekspor.', 'info');
@@ -304,7 +303,6 @@ async function loadSiswaAndRenderTable(force = false) {
     
     if (error) return showStatusMessage(`Gagal memuat data siswa: ${error.message}`, 'error');
     
-    // Mapping nama kolom agar sesuai dengan HTML
     AppState.siswa = data.map(s => ({
         NISN: s.nisn, Nama: s.nama, Kelas: s.kelas, WhatsappOrtu: s.whatsapp_ortu
     }));
@@ -312,7 +310,6 @@ async function loadSiswaAndRenderTable(force = false) {
 }
 
 function renderSiswaTable(siswaArray) {
-    // Fungsi ini tidak perlu diubah
     const tableBody = document.getElementById('siswaResultsTableBody');
     tableBody.innerHTML = siswaArray.length === 0
         ? '<tr><td colspan="5" style="text-align: center;">Data siswa tidak ditemukan.</td></tr>'
@@ -400,7 +397,7 @@ async function handleSiswaFileSelect(event) {
                 nisn: row.NISN, nama: row.Nama, kelas: row.Kelas,
                 whatsapp_ortu: row['Whatsapp Ortu'] || row.WhatsappOrtu || null
             }));
-            const { error } = await supabase.from('siswa').insert(dataToInsert, { upsert: true }); // upsert akan update jika nisn sudah ada
+            const { error } = await supabase.from('siswa').insert(dataToInsert, { upsert: true });
             showLoading(false);
             if (error) return showStatusMessage(`Gagal impor: ${error.message}`, 'error');
             showStatusMessage(`${dataToInsert.length} data siswa berhasil diimpor/diperbarui!`, 'success');
@@ -432,7 +429,7 @@ async function handlePelanggaranFileSelect(event) {
             showLoading(false);
             if (error) return showStatusMessage(`Gagal impor: ${error.message}`, 'error');
             showStatusMessage(`${dataToInsert.length} data pelanggaran berhasil diimpor!`, 'success');
-            await loadPelanggaranData(); // Muat ulang data pelanggaran
+            await loadPelanggaranData();
         },
         error: (err) => {
             showLoading(false);
@@ -497,10 +494,7 @@ function exportAllQrCodes() {
 }
 
 
-// --- FUNGSI MANAJEMEN PENGGUNA (TIDAK DISARANKAN DI CLIENT-SIDE, TAPI DITINGGALKAN UNTUK KELENGKAPAN) ---
-// CATATAN PENTING: Mengelola pengguna (membuat/menghapus) dari client-side adalah risiko keamanan.
-// Ini seharusnya dilakukan melalui Supabase Edge Functions dengan hak akses admin.
-// Kode di bawah ini ditinggalkan, tetapi membutuhkan kebijakan RLS yang sangat hati-hati.
+// --- FUNGSI MANAJEMEN PENGGUNA (TIDAK DISARANKAN DI CLIENT-SIDE) ---
 async function loadUsers() { console.warn("Fungsi loadUsers perlu implementasi RLS yang aman."); }
 async function saveUser() { console.warn("Fungsi saveUser perlu dipindah ke Edge Function."); }
 async function deleteUserHandler() { console.warn("Fungsi deleteUserHandler perlu dipindah ke Edge Function."); }
