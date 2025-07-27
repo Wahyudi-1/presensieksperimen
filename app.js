@@ -2,11 +2,11 @@
  * =================================================================
  * SCRIPT UTAMA FRONTEND - SISTEM PRESENSI QR (DENGAN MODUL KEDISIPLINAN)
  * =================================================================
- * @version 4.3 - Final Initialization Fix
+ * @version 4.4 - Final Auth Flow Fix
  * @author Gemini AI Expert for User
  *
- * PERUBAHAN UTAMA (v4.3):
- * - [FIX] Memperbaiki inisialisasi Supabase client secara definitif untuk mengatasi error "Cannot access 'supabase' before initialization".
+ * PERUBAHAN UTAMA (v4.4):
+ * - [FIX] Memperbaiki logika di `checkAuthenticationAndSetup` untuk menangani alur reset password dengan benar.
  */
 
 // ====================================================================
@@ -17,15 +17,8 @@
 const SUPABASE_URL = 'https://vxuejzlfxykebfawhujh.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4';
 
-// ========== PERBAIKAN FINAL DAN DIJAMIN BERHASIL ==========
-// Ambil fungsi 'createClient' dari objek global 'supabase' yang ada di 'window'.
-// 'window.supabase' merujuk ke library yang dimuat oleh CDN.
 const { createClient } = window.supabase; 
-
-// Buat instance klien kita dan simpan ke dalam variabel 'supabase' baru yang akan kita gunakan di seluruh file ini.
-// Tidak akan ada lagi konflik nama karena kita sudah mengambil fungsinya terlebih dahulu.
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-// ========== AKHIR DARI PERBAIKAN ==========
 
 
 // --- State Aplikasi ---
@@ -96,38 +89,32 @@ function setupPasswordToggle() {
 // ====================================================================
 
 // --- FUNGSI OTENTIKASI & MANAJEMEN SESI ---
-// Ganti seluruh fungsi checkAuthenticationAndSetup dengan ini:
+async function checkAuthenticationAndSetup() {
+    const isPasswordRecovery = window.location.hash.includes('type=recovery');
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session && window.location.pathname.includes('dashboard.html')) {
+        window.location.href = 'index.html';
+        return;
+    }
 
-    async function checkAuthenticationAndSetup() {
-        // Cek apakah URL berisi hash untuk pemulihan password
-        const isPasswordRecovery = window.location.hash.includes('type=recovery');
-    
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        // Logika Pengalihan Halaman (Diperbaiki)
-        if (!session && window.location.pathname.includes('dashboard.html')) {
-            // Jika tidak ada sesi DAN ada di dashboard, tendang ke login
-            window.location.href = 'index.html';
-            return;
-        }
-    
-        if (session && window.location.pathname.includes('index.html')) {
-            // Kondisi baru:
-            // HANYA redirect ke dashboard jika ini BUKAN proses recovery password
-            if (!isPasswordRecovery) {
-                window.location.href = 'dashboard.html';
-                return;
-            }
-        }
-    
-        if (session) {
-            // Kode ini tetap berjalan untuk menampilkan pesan selamat datang di dashboard
-            const welcomeEl = document.getElementById('welcomeMessage');
-            if (welcomeEl) {
-                 welcomeEl.textContent = `Selamat Datang, ${session.user.email}!`;
-            }
+    // ========== PERBAIKAN LOGIKA DI SINI ==========
+    // Kondisi yang benar adalah:
+    // JIKA ada sesi DAN kita ada di halaman login DAN ini BUKAN proses recovery,
+    // MAKA alihkan ke dashboard.
+    if (session && window.location.pathname.includes('index.html') && !isPasswordRecovery) {
+        window.location.href = 'dashboard.html';
+        return;
+    }
+    // ========== AKHIR DARI PERBAIKAN ==========
+
+    if (session) {
+        const welcomeEl = document.getElementById('welcomeMessage');
+        if (welcomeEl) {
+             welcomeEl.textContent = `Selamat Datang, ${session.user.email}!`;
         }
     }
+}
 
 function setupAuthListener() {
     supabase.auth.onAuthStateChange((event, session) => {
@@ -232,7 +219,7 @@ function startQrScanner(type) {
     const onScanSuccess = (decodedText) => {
         scanner.pause(true);
         processQrScan(decodedText, type);
-        setTimeout(() => scanner.resume(), 500);
+        setTimeout(() => scanner.resume(), 1000); // Jeda 1 detik
     };
     scanner.render(onScanSuccess, () => {});
     if (type === 'datang') qrScannerDatang = scanner; else qrScannerPulang = scanner;
@@ -252,7 +239,6 @@ function stopQrScanner(type) {
 async function processQrScan(nisn, type) {
     const resultEl = document.getElementById(type === 'datang' ? 'scanResultDatang' : 'scanResultPulang');
     
-    // 1. Validasi apakah siswa terdaftar (ini sudah benar)
     const { data: siswa, error: siswaError } = await supabase
         .from('siswa')
         .select('nama')
@@ -268,20 +254,18 @@ async function processQrScan(nisn, type) {
         return;
     }
 
-    // Tentukan rentang waktu untuk hari ini
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // 2. Cek status presensi hari ini SEBELUM melakukan aksi
     const { data: presensiHariIni, error: cekError } = await supabase
         .from('presensi')
         .select('waktu_datang, waktu_pulang')
         .eq('nisn_siswa', nisn)
         .gte('waktu_datang', today.toISOString())
         .lt('waktu_datang', tomorrow.toISOString())
-        .maybeSingle(); // Ambil satu baris jika ada, atau null jika tidak ada
+        .maybeSingle();
 
     if (cekError) {
         const errorMessage = `Gagal memeriksa data presensi: ${cekError.message}`;
@@ -291,10 +275,8 @@ async function processQrScan(nisn, type) {
         return;
     }
 
-    // 3. Logika baru berdasarkan hasil pengecekan
     if (type === 'datang') {
         if (presensiHariIni) {
-            // Jika data sudah ada, berarti siswa sudah presensi datang
             const errorMessage = `DITOLAK: ${siswa.nama} sudah melakukan presensi datang hari ini.`;
             resultEl.className = 'scan-result error';
             resultEl.textContent = errorMessage;
@@ -302,7 +284,6 @@ async function processQrScan(nisn, type) {
             return;
         }
 
-        // Jika tidak ada data, lanjutkan untuk insert
         const { error: insertError } = await supabase
             .from('presensi')
             .insert({ nisn_siswa: nisn, waktu_datang: new Date() });
@@ -319,9 +300,8 @@ async function processQrScan(nisn, type) {
             loadAndRenderDailyLog('datang');
         }
 
-    } else { // type 'pulang'
+    } else {
         if (!presensiHariIni) {
-            // Jika tidak ada data sama sekali, berarti belum presensi datang
             const errorMessage = `DITOLAK: ${siswa.nama} belum melakukan presensi datang hari ini.`;
             resultEl.className = 'scan-result error';
             resultEl.textContent = errorMessage;
@@ -330,7 +310,6 @@ async function processQrScan(nisn, type) {
         }
 
         if (presensiHariIni && presensiHariIni.waktu_pulang) {
-            // Jika data ada DAN waktu_pulang sudah terisi
             const errorMessage = `DITOLAK: ${siswa.nama} sudah melakukan presensi pulang hari ini.`;
             resultEl.className = 'scan-result error';
             resultEl.textContent = errorMessage;
@@ -338,7 +317,6 @@ async function processQrScan(nisn, type) {
             return;
         }
 
-        // Jika data ada dan waktu_pulang kosong, lanjutkan update
         const { error: updateError } = await supabase
             .from('presensi')
             .update({ waktu_pulang: new Date() })
@@ -358,28 +336,22 @@ async function processQrScan(nisn, type) {
         }
     }
 }
-/**
- * [BARU] Memuat dan merender log presensi harian untuk tipe tertentu (datang/pulang).
- * @param {'datang' | 'pulang'} type - Tipe log yang ingin ditampilkan.
- */
 async function loadAndRenderDailyLog(type) {
     const tableBodyId = type === 'datang' ? 'logTableBodyDatang' : 'logTableBodyPulang';
     const tableBody = document.getElementById(tableBodyId);
     if (!tableBody) return;
 
-    // Tentukan rentang waktu untuk hari ini
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Ambil data dari Supabase
     const { data, error } = await supabase
         .from('presensi')
         .select('waktu_datang, waktu_pulang, siswa (nisn, nama)')
         .gte('waktu_datang', today.toISOString())
         .lt('waktu_datang', tomorrow.toISOString())
-        .order('waktu_datang', { ascending: false }); // Urutkan dari yang terbaru
+        .order('waktu_datang', { ascending: false });
 
     if (error) {
         console.error(`Gagal memuat log ${type}:`, error);
@@ -387,14 +359,11 @@ async function loadAndRenderDailyLog(type) {
         return;
     }
 
-    // Render tabel
     tableBody.innerHTML = data.length === 0
         ? `<tr><td colspan="3" style="text-align: center;">Belum ada data presensi hari ini.</td></tr>`
         : data.map(row => {
-            // Tentukan waktu yang akan ditampilkan berdasarkan tipe log
             const waktuTampil = type === 'datang' ? row.waktu_datang : row.waktu_pulang;
             
-            // Jangan tampilkan baris di log 'pulang' jika siswa belum scan pulang
             if (type === 'pulang' && !waktuTampil) {
                 return '';
             }
@@ -666,6 +635,7 @@ function exportAllQrCodes() {
 
 
 // --- FUNGSI MANAJEMEN PENGGUNA ---
+// Dinonaktifkan sesuai keputusan untuk mengelola via dashboard Supabase
 // async function loadUsers() { console.warn("Fungsi loadUsers perlu implementasi RLS yang aman."); }
 // async function saveUser() { console.warn("Fungsi saveUser perlu dipindah ke Edge Function."); }
 // async function deleteUserHandler() { console.warn("Fungsi deleteUserHandler perlu dipindah ke Edge Function."); }
@@ -770,12 +740,10 @@ function setupDashboardListeners() {
                 section.style.display = section.id === sectionId ? 'block' : 'none';
             });
             const actions = {
-                // PERBAIKAN DI SINI
                 datangSection: () => {
                     startQrScanner('datang');
                     loadAndRenderDailyLog('datang');
                 },
-                // DAN DI SINI
                 pulangSection: () => {
                     startQrScanner('pulang');
                     loadAndRenderDailyLog('pulang');
@@ -798,8 +766,6 @@ function setupDashboardListeners() {
     document.getElementById('exportRekapButton')?.addEventListener('click', exportRekapToExcel);
     document.getElementById('formSiswa')?.addEventListener('submit', (e) => { e.preventDefault(); saveSiswa(); });
     document.getElementById('resetSiswaButton')?.addEventListener('click', resetFormSiswa);
-    // document.getElementById('formPengguna')?.addEventListener('submit', (e) => { e.preventDefault(); saveUser(); });
-    // document.getElementById('resetPenggunaButton')?.addEventListener('click', resetFormPengguna);
     document.querySelector('#qrModal .modal-close-button')?.addEventListener('click', () => {
         document.getElementById('qrModal').style.display = 'none';
     });
