@@ -2,14 +2,13 @@
  * =================================================================
  * SCRIPT UTAMA FRONTEND - SISTEM PRESENSI QR (DENGAN MODUL KEDISIPLINAN)
  * =================================================================
- * @version 4.0 - Supabase Migration & CSV Import Feature
+ * @version 4.1 - Password Recovery Flow
  * @author Gemini AI Expert for User
  *
- * PERUBAHAN UTAMA:
- * - [MIGRASI] Mengganti semua panggilan ke Google Apps Script dengan Supabase SDK.
- * - [MIGRASI] Mengimplementasikan sistem otentikasi Supabase.
- * - [FITUR] Menambahkan fungsi untuk impor data Siswa & Pelanggaran dari file CSV via frontend.
- * - [REFACTOR] Menyesuaikan semua fungsi CRUD (Create, Read, Update, Delete) untuk berinteraksi dengan Supabase.
+ * PERUBAHAN UTAMA (v4.1):
+ * - [FITUR] Menambahkan fungsi `setupAuthListener` untuk menangani event otentikasi dari Supabase.
+ * - [FITUR] Mengimplementasikan alur untuk menampilkan form reset password saat pengguna datang dari link recovery.
+ * - [UPDATE] Memanggil `setupAuthListener` pada inisialisasi halaman.
  */
 
 // ====================================================================
@@ -18,13 +17,10 @@
 
 // --- Inisialisasi Klien Supabase ---
 // Ganti dengan URL dan Kunci Anon dari dashboard Supabase Anda.
-const SUPABASE_URL = 'https://vxuejzlfxykebfawhujh.supabase.co'; 
+const SUPABASE_URL = 'https://vxuejzlfyxykebfawhujh.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4';
 
-// PERBAIKAN DI SINI: Memanggil createClient dari objek global 'supabase' yang disediakan oleh library
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-// Untuk selanjutnya di dalam kode, kita akan memanggil 'supabaseClient'
-// Namun, agar tidak perlu mengubah sisa kode, kita akan menamainya 'supabase'
 const supabase = supabaseClient;
 
 // --- State Aplikasi ---
@@ -39,7 +35,7 @@ let qrScannerDatang, qrScannerPulang;
 let isScanning = { datang: false, pulang: false };
 
 // ====================================================================
-// TAHAP 2: FUNGSI-FUNGSI PEMBANTU (HELPERS) - TIDAK ADA PERUBAHAN
+// TAHAP 2: FUNGSI-FUNGSI PEMBANTU (HELPERS)
 // ====================================================================
 
 function showLoading(isLoading) {
@@ -91,7 +87,7 @@ function setupPasswordToggle() {
 }
 
 // ====================================================================
-// TAHAP 3: FUNGSI-FUNGSI UTAMA (REFACTORED FOR SUPABASE)
+// TAHAP 3: FUNGSI-FUNGSI UTAMA
 // ====================================================================
 
 // --- FUNGSI OTENTIKASI & MANAJEMEN SESI ---
@@ -103,7 +99,8 @@ async function checkAuthenticationAndSetup() {
         window.location.href = 'index.html';
         return;
     }
-    if (session && window.location.pathname.includes('index.html')) {
+    if (session && window.location.pathname.includes('index.html') && !session.user.user_metadata.is_password_recovery) {
+        // Cek tambahan agar tidak redirect saat proses recovery password
         window.location.href = 'dashboard.html';
         return;
     }
@@ -113,12 +110,51 @@ async function checkAuthenticationAndSetup() {
         if (welcomeEl) {
              welcomeEl.textContent = `Selamat Datang, ${session.user.email}!`;
         }
-        // TODO: Implementasikan pengambilan peran dari tabel 'profiles' untuk menyembunyikan menu admin.
     }
 }
 
+/**
+ * [BARU] Listener untuk menangani semua event otentikasi, termasuk reset password.
+ */
+function setupAuthListener() {
+    supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+            const loginBox = document.querySelector('.login-box');
+            const resetContainer = document.getElementById('resetPasswordContainer');
+            if (!loginBox || !resetContainer) return;
+            
+            loginBox.style.display = 'none';
+            resetContainer.style.display = 'grid';
+            
+            const resetForm = document.getElementById('resetPasswordForm');
+            resetForm.onsubmit = async (e) => { // Menggunakan onsubmit untuk mencegah listener ganda
+                e.preventDefault();
+                const newPassword = document.getElementById('newPassword').value;
+                if (!newPassword || newPassword.length < 6) {
+                    return showStatusMessage('Password baru minimal 6 karakter.', 'error');
+                }
+
+                showLoading(true);
+                const { error } = await supabase.auth.updateUser({ password: newPassword });
+                showLoading(false);
+
+                if (error) {
+                    return showStatusMessage(`Gagal memperbarui password: ${error.message}`, 'error');
+                }
+                
+                showStatusMessage('Password berhasil diperbarui! Silakan login dengan password baru Anda.', 'success');
+
+                setTimeout(() => {
+                    resetContainer.style.display = 'none';
+                    loginBox.style.display = 'grid';
+                }, 3000);
+            };
+        }
+    });
+}
+
 async function handleLogin() {
-    const usernameEl = document.getElementById('username'); // Ini adalah email
+    const usernameEl = document.getElementById('username');
     const passwordEl = document.getElementById('password');
     if (!usernameEl.value || !passwordEl.value) {
         return showStatusMessage("Email dan password harus diisi.", 'error');
@@ -151,7 +187,7 @@ async function handleLogout() {
 }
 
 
-// --- FUNGSI-FUNGSI SCANNER & PRESENSI (REFACTORED) ---
+// --- FUNGSI-FUNGSI SCANNER & PRESENSI ---
 function startQrScanner(type) {
     if (isScanning[type]) return;
     const scannerId = type === 'datang' ? 'qrScannerDatang' : 'qrScannerPulang';
@@ -214,7 +250,7 @@ async function processQrScan(nisn, type) {
             resultEl.className = 'scan-result success';
             resultEl.innerHTML = `<strong>Presensi Datang Berhasil!</strong><br>${siswa.nama} (${nisn}) - ${waktu}`;
         }
-    } else { // type 'pulang'
+    } else {
         const { error } = await supabase
             .from('presensi')
             .update({ waktu_pulang: new Date() })
@@ -237,7 +273,7 @@ async function processQrScan(nisn, type) {
 }
 
 
-// --- FUNGSI REKAP PRESENSI (REFACTORED) ---
+// --- FUNGSI REKAP PRESENSI ---
 async function filterAndRenderRekap() {
     const startDateStr = document.getElementById('rekapFilterTanggalMulai').value;
     const endDateStr = document.getElementById('rekapFilterTanggalSelesai').value;
@@ -291,7 +327,7 @@ function exportRekapToExcel() {
     XLSX.writeFile(wb, `Rekap_Presensi_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-// --- FUNGSI MANAJEMEN SISWA (REFACTORED) ---
+// --- FUNGSI MANAJEMEN SISWA ---
 async function loadSiswaAndRenderTable(force = false) {
     if (!force && AppState.siswa.length > 0) {
         renderSiswaTable(AppState.siswa);
@@ -380,7 +416,7 @@ async function deleteSiswaHandler(nisn) {
     }
 }
 
-// --- FUNGSI IMPOR CSV BARU ---
+// --- FUNGSI IMPOR CSV ---
 
 async function handleSiswaFileSelect(event) {
     const file = event.target.files[0];
@@ -440,7 +476,7 @@ async function handlePelanggaranFileSelect(event) {
 }
 
 
-// --- FUNGSI QR CODE & EKSPOR LAINNYA (TIDAK BERUBAH) ---
+// --- FUNGSI QR CODE & EKSPOR LAINNYA ---
 function generateQRHandler(nisn) {
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
     if (!siswa) return;
@@ -494,14 +530,14 @@ function exportAllQrCodes() {
 }
 
 
-// --- FUNGSI MANAJEMEN PENGGUNA (TIDAK DISARANKAN DI CLIENT-SIDE) ---
+// --- FUNGSI MANAJEMEN PENGGUNA ---
 async function loadUsers() { console.warn("Fungsi loadUsers perlu implementasi RLS yang aman."); }
 async function saveUser() { console.warn("Fungsi saveUser perlu dipindah ke Edge Function."); }
 async function deleteUserHandler() { console.warn("Fungsi deleteUserHandler perlu dipindah ke Edge Function."); }
 function resetFormPengguna() { document.getElementById('formPengguna').reset(); }
 
 
-// --- FUNGSI MODUL KEDISIPLINAN (REFACTORED) ---
+// --- FUNGSI MODUL KEDISIPLINAN ---
 async function loadPelanggaranData() {
     const { data, error } = await supabase.from('pelanggaran').select('*');
     if (error) return console.error("Gagal memuat data pelanggaran:", error);
@@ -629,13 +665,11 @@ function setupDashboardListeners() {
     document.getElementById('exportSiswaExcelButton')?.addEventListener('click', exportSiswaToExcel);
     document.getElementById('exportAllQrButton')?.addEventListener('click', exportAllQrCodes);
 
-    // Listener untuk fitur impor
     document.getElementById('importSiswaButton')?.addEventListener('click', () => document.getElementById('importSiswaInput').click());
     document.getElementById('importSiswaInput')?.addEventListener('change', handleSiswaFileSelect);
     document.getElementById('importPelanggaranButton')?.addEventListener('click', () => document.getElementById('importPelanggaranInput').click());
     document.getElementById('importPelanggaranInput')?.addEventListener('change', handlePelanggaranFileSelect);
 
-    // Listener untuk modul disiplin
     document.getElementById('nisnDisiplinInput')?.addEventListener('blur', handleNisnDisiplinInput);
     document.getElementById('tingkatDisiplinInput')?.addEventListener('input', handleTingkatChange);
     document.getElementById('formDisiplin')?.addEventListener('submit', handleSubmitDisiplin);
@@ -644,6 +678,7 @@ function setupDashboardListeners() {
 
 async function initDashboardPage() {
     await checkAuthenticationAndSetup();
+    setupAuthListener();
     setupDashboardListeners();
     await loadSiswaAndRenderTable();
     await loadPelanggaranData();
@@ -652,6 +687,7 @@ async function initDashboardPage() {
 
 async function initLoginPage() {
     await checkAuthenticationAndSetup();
+    setupAuthListener();
     setupPasswordToggle();
 }
 
