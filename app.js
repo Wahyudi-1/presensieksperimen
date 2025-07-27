@@ -219,7 +219,7 @@ function startQrScanner(type) {
     const onScanSuccess = (decodedText) => {
         scanner.pause(true);
         processQrScan(decodedText, type);
-        setTimeout(() => scanner.resume(), 3000);
+        setTimeout(() => scanner.resume(), 500);
     };
     scanner.render(onScanSuccess, () => {});
     if (type === 'datang') qrScannerDatang = scanner; else qrScannerPulang = scanner;
