@@ -793,16 +793,35 @@ async function initDashboardPage() {
     document.querySelector('.section-nav button[data-section="datangSection"]')?.click();
 }
 
+// Ganti fungsi initLoginPage yang lama dengan versi baru ini
+
 async function initLoginPage() {
-    await checkAuthenticationAndSetup();
-    setupAuthListener();
+    // Panggil fungsi ini terlebih dahulu
     setupPasswordToggle();
+    
+    // Cek URL secara proaktif saat halaman dimuat
+    if (window.location.hash.includes('type=recovery')) {
+        // Jika ini adalah alur reset password, langsung tampilkan formnya
+        const loginBox = document.querySelector('.login-box');
+        const resetContainer = document.getElementById('resetPasswordContainer');
+        if (loginBox && resetContainer) {
+            loginBox.style.display = 'none';
+            resetContainer.style.display = 'grid';
+        }
+    }
+
+    // Tetap pasang listener untuk menangani event secara dinamis
+    setupAuthListener();
+
+    // Jalankan pengecekan sesi setelah listener dipasang
+    await checkAuthenticationAndSetup();
+
+    // Pasang listener untuk link lupa password
     document.getElementById('forgotPasswordLink')?.addEventListener('click', (e) => {
         e.preventDefault();
         handleForgotPassword();
     });
 }
-
 // ====================================================================
 // TAHAP 5: TITIK MASUK APLIKASI (ENTRY POINT)
 // ====================================================================
