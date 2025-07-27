@@ -554,10 +554,10 @@ function exportAllQrCodes() {
 
 
 // --- FUNGSI MANAJEMEN PENGGUNA ---
-async function loadUsers() { console.warn("Fungsi loadUsers perlu implementasi RLS yang aman."); }
-async function saveUser() { console.warn("Fungsi saveUser perlu dipindah ke Edge Function."); }
-async function deleteUserHandler() { console.warn("Fungsi deleteUserHandler perlu dipindah ke Edge Function."); }
-function resetFormPengguna() { document.getElementById('formPengguna').reset(); }
+// async function loadUsers() { console.warn("Fungsi loadUsers perlu implementasi RLS yang aman."); }
+// async function saveUser() { console.warn("Fungsi saveUser perlu dipindah ke Edge Function."); }
+// async function deleteUserHandler() { console.warn("Fungsi deleteUserHandler perlu dipindah ke Edge Function."); }
+//function resetFormPengguna() { document.getElementById('formPengguna').reset(); }
 
 
 // --- FUNGSI MODUL KEDISIPLINAN ---
@@ -668,7 +668,7 @@ function setupDashboardListeners() {
                 },
                 disiplinSection: () => {},
                 siswaSection: () => loadSiswaAndRenderTable(),
-                penggunaSection: () => loadUsers(),
+                // penggunaSection: () => loadUsers(),
             };
             actions[sectionId]?.();
         });
@@ -679,8 +679,8 @@ function setupDashboardListeners() {
     document.getElementById('exportRekapButton')?.addEventListener('click', exportRekapToExcel);
     document.getElementById('formSiswa')?.addEventListener('submit', (e) => { e.preventDefault(); saveSiswa(); });
     document.getElementById('resetSiswaButton')?.addEventListener('click', resetFormSiswa);
-    document.getElementById('formPengguna')?.addEventListener('submit', (e) => { e.preventDefault(); saveUser(); });
-    document.getElementById('resetPenggunaButton')?.addEventListener('click', resetFormPengguna);
+    // document.getElementById('formPengguna')?.addEventListener('submit', (e) => { e.preventDefault(); saveUser(); });
+    // document.getElementById('resetPenggunaButton')?.addEventListener('click', resetFormPengguna);
     document.querySelector('#qrModal .modal-close-button')?.addEventListener('click', () => {
         document.getElementById('qrModal').style.display = 'none';
     });
