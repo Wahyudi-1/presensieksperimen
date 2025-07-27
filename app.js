@@ -16,7 +16,13 @@
 // TAHAP 1: KONFIGURASI GLOBAL DAN STATE APLIKASI
 // ====================================================================
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyU6YGl9nyANKrqf9d9zzzTNYNll2KsIhR65KKBu_R0rpNTXAamsouM60GZZqAkyKnv/exec";
+// const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyU6YGl9nyANKrqf9d9zzzTNYNll2KsIhR65KKBu_R0rpNTXAamsouM60GZZqAkyKnv/exec";
+
+// TAMBAHKAN BLOK INI: GANTI DENGAN KUNCI ANDA SENDIRI
+const SUPABASE_URL = 'https://vxuejzlfxykebfawhujh.supabase.co'; 
+const SUPABASE_ANON_KEY = 'KUNCI_ANON_PANJANG_ANDA';
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const AppState = {
     siswa: [],
