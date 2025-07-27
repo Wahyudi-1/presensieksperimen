@@ -2,12 +2,11 @@
  * =================================================================
  * SCRIPT UTAMA FRONTEND - SISTEM PRESENSI QR (DENGAN MODUL KEDISIPLINAN)
  * =================================================================
- * @version 4.2 - Forgot Password Implementation
+ * @version 4.3 - Final Initialization Fix
  * @author Gemini AI Expert for User
  *
- * PERUBAHAN UTAMA (v4.2):
- * - [FITUR] Menambahkan fungsi `handleForgotPassword` untuk mengirim email recovery.
- * - [UPDATE] Menambahkan event listener untuk link "Lupa Password?" pada halaman login.
+ * PERUBAHAN UTAMA (v4.3):
+ * - [FIX] Memperbaiki inisialisasi Supabase client untuk mengatasi error "Cannot access 'supabase' before initialization".
  */
 
 // ====================================================================
@@ -15,15 +14,17 @@
 // ====================================================================
 
 // --- Inisialisasi Klien Supabase ---
-// Ganti dengan URL dan Kunci Anon dari dashboard Supabase Anda.
 const SUPABASE_URL = 'https://vxuejzlfyxykebfawhujh.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4';
 
-// PERBAIKAN: Panggil .createClient dari objek global supabase yang disediakan oleh library via CDN
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ========== PERBAIKAN FINAL DAN TERBAIK DI SINI ==========
+// Kita ambil fungsi 'createClient' dari objek global 'supabase' yang dimuat oleh CDN
+const { createClient } = supabase; 
+// Sekarang kita buat instance klien kita sendiri dan menyimpannya ke dalam variabel 'supabase'
+// Tidak ada lagi konflik nama variabel.
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ========== AKHIR DARI PERBAIKAN ==========
 
-// Untuk konsistensi dengan sisa kode, kita akan gunakan nama variabel 'supabase'
-const supabase = supabaseClient;
 
 // --- State Aplikasi ---
 const AppState = {
@@ -93,7 +94,6 @@ function setupPasswordToggle() {
 // ====================================================================
 
 // --- FUNGSI OTENTIKASI & MANAJEMEN SESI ---
-
 async function checkAuthenticationAndSetup() {
     const { data: { session } } = await supabase.auth.getSession();
     
@@ -184,9 +184,6 @@ async function handleLogout() {
     }
 }
 
-/**
- * [BARU] Menangani permintaan reset password dari pengguna.
- */
 async function handleForgotPassword() {
     const emailEl = document.getElementById('username');
     const email = emailEl.value;
@@ -442,7 +439,6 @@ async function deleteSiswaHandler(nisn) {
 }
 
 // --- FUNGSI IMPOR CSV ---
-
 async function handleSiswaFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
