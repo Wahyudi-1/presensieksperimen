@@ -19,10 +19,7 @@
 // const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyU6YGl9nyANKrqf9d9zzzTNYNll2KsIhR65KKBu_R0rpNTXAamsouM60GZZqAkyKnv/exec";
 
 // TAMBAHKAN BLOK INI: GANTI DENGAN KUNCI ANDA SENDIRI
-const SUPABASE_URL = 'https://vxuejzlfxykebfawhujh.supabase.co'; 
-const SUPABASE_ANON_KEY = 'KUNCI_ANON_PANJANG_ANDA';
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = supabase.createClient('https://vxuejzlfxykebfawhujh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4dWVqemxmeHlrZWJmYXdodWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5MTYzMDIsImV4cCI6MjA2ODQ5MjMwMn0.EMBpmL1RTuydWlkryHwUqm9Y8_2oIoAo5sdA9g9sFt4');
 
 const AppState = {
     siswa: [],
@@ -35,7 +32,7 @@ let qrScannerDatang, qrScannerPulang;
 let isScanning = { datang: false, pulang: false };
 
 // ====================================================================
-// TAHAP 2: FUNGSI-FUNGSI PEMBANTU (HELPERS)
+// TAHAP 2: FUNGSI-FUNGSI PEMBANTU (HELPERS) - TIDAK ADA PERUBAHAN BESAR
 // ====================================================================
 
 function showLoading(isLoading) {
@@ -72,23 +69,6 @@ function playSound(type) {
     } catch (e) { console.warn("Web Audio API tidak didukung atau gagal.", e); }
 }
 
-async function makeApiCall(url, options = {}, showLoader = true) {
-    if (showLoader) showLoading(true);
-    try {
-        const response = await fetch(url, options);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const result = await response.json();
-        if (result.status === 'success') return result;
-        else throw new Error(result.message || 'Terjadi kesalahan pada server.');
-    } catch (error) {
-        showStatusMessage(`Kesalahan: ${error.message}`, 'error');
-        playSound('error');
-        return null;
-    } finally {
-        if (showLoader) showLoading(false);
-    }
-}
-
 function setupPasswordToggle() {
     const toggleIcon = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
@@ -104,46 +84,71 @@ function setupPasswordToggle() {
 }
 
 // ====================================================================
-// TAHAP 3: FUNGSI-FUNGSI UTAMA
+// TAHAP 3: FUNGSI-FUNGSI UTAMA (REFACTORED FOR SUPABASE)
 // ====================================================================
 
-// --- FUNGSI LOGIN, LOGOUT, PRESENSI, DAN REKAP (TIDAK BERUBAH) ---
-function checkAuthentication() {
-    const user = sessionStorage.getItem('loggedInUser');
-    if (user) {
-        const userData = JSON.parse(user);
-        const welcomeEl = document.getElementById('welcomeMessage');
-        if (welcomeEl) welcomeEl.textContent = `Selamat Datang, ${userData.nama}!`;
-        if (userData.peran && userData.peran.toLowerCase() !== 'admin') {
-            const btnPengguna = document.querySelector('button[data-section="penggunaSection"]');
-            if (btnPengguna) btnPengguna.style.display = 'none';
-        }
-    } else if (window.location.pathname.includes('dashboard.html')) {
+// --- FUNGSI OTENTIKASI & MANAJEMEN SESI ---
+
+async function checkAuthenticationAndSetup() {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Logika Pengalihan Halaman
+    if (!session && window.location.pathname.includes('dashboard.html')) {
         window.location.href = 'index.html';
+        return;
+    }
+    if (session && window.location.pathname.includes('index.html')) {
+        window.location.href = 'dashboard.html';
+        return;
+    }
+
+    if (session) {
+        // Ambil data profil (nama, peran) dari tabel 'profiles'
+        // Ini adalah contoh, Anda perlu membuat tabel 'profiles' dan mengisinya
+        // Untuk sementara, kita bisa gunakan email pengguna
+        const welcomeEl = document.getElementById('welcomeMessage');
+        if (welcomeEl) {
+             welcomeEl.textContent = `Selamat Datang, ${session.user.email}!`;
+        }
+        // TODO: Implementasikan pengambilan peran dari database untuk menyembunyikan menu admin.
     }
 }
+
 async function handleLogin() {
-    const usernameEl = document.getElementById('username');
+    const usernameEl = document.getElementById('username'); // Ini adalah email
     const passwordEl = document.getElementById('password');
     if (!usernameEl.value || !passwordEl.value) {
-        return showStatusMessage("Username dan password harus diisi.", 'error');
+        return showStatusMessage("Email dan password harus diisi.", 'error');
     }
-    const formData = new FormData();
-    formData.append('action', 'login');
-    formData.append('username', usernameEl.value);
-    formData.append('password', passwordEl.value);
-    const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
-    if (result) {
-        sessionStorage.setItem('loggedInUser', JSON.stringify(result.data));
-        window.location.href = 'dashboard.html';
+    showLoading(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: usernameEl.value,
+        password: passwordEl.value,
+    });
+
+    showLoading(false);
+    if (error) {
+        return showStatusMessage(`Login Gagal: ${error.message}`, 'error');
     }
+    window.location.href = 'dashboard.html';
 }
-function handleLogout() {
+
+async function handleLogout() {
     if (confirm('Apakah Anda yakin ingin logout?')) {
-        sessionStorage.removeItem('loggedInUser');
-        window.location.href = 'index.html';
+        showLoading(true);
+        const { error } = await supabase.auth.signOut();
+        showLoading(false);
+        if (error) {
+            alert('Gagal logout: ' + error.message);
+        } else {
+            window.location.href = 'index.html';
+        }
     }
 }
+
+
+// --- FUNGSI-FUNGSI SCANNER & PRESENSI (REFACTORED) ---
 function startQrScanner(type) {
     if (isScanning[type]) return;
     const scannerId = type === 'datang' ? 'qrScannerDatang' : 'qrScannerPulang';
@@ -158,6 +163,7 @@ function startQrScanner(type) {
     isScanning[type] = true;
     document.getElementById(type === 'datang' ? 'scanResultDatang' : 'scanResultPulang').textContent = "Arahkan kamera ke QR Code Siswa";
 }
+
 function stopQrScanner(type) {
     const scanner = type === 'datang' ? qrScannerDatang : qrScannerPulang;
     if (scanner && isScanning[type]) {
@@ -166,11 +172,18 @@ function stopQrScanner(type) {
         finally { isScanning[type] = false; }
     }
 }
-async function processQrScan(qrData, type) {
+
+async function processQrScan(nisn, type) {
     const resultEl = document.getElementById(type === 'datang' ? 'scanResultDatang' : 'scanResultPulang');
-    const nisn = qrData;
-    const siswa = AppState.siswa.find(s => s.NISN == nisn);
-    if (!siswa) {
+    
+    // Validasi siswa ada di database
+    const { data: siswa, error: siswaError } = await supabase
+        .from('siswa')
+        .select('nama')
+        .eq('nisn', nisn)
+        .single();
+        
+    if (siswaError || !siswa) {
         const errorMessage = `Siswa dengan NISN ${nisn} tidak terdaftar.`;
         resultEl.className = 'scan-result error';
         resultEl.textContent = errorMessage;
@@ -178,57 +191,98 @@ async function processQrScan(qrData, type) {
         showStatusMessage(errorMessage, 'error');
         return;
     }
-    const formData = new FormData();
-    formData.append('action', 'recordAttendance');
-    formData.append('nisn', nisn);
-    formData.append('type', type);
-    const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData }, false); 
-    if (result) {
-        playSound('success');
-        resultEl.className = 'scan-result success';
-        resultEl.innerHTML = `<strong>${result.message}</strong><br>${siswa.Nama} (${nisn}) - ${result.waktu}`;
-        const logTable = document.getElementById(type === 'datang' ? 'logTableBodyDatang' : 'logTableBodyPulang');
-        logTable.insertRow(0).innerHTML = `<td>${result.waktu}</td><td>${nisn}</td><td>${siswa.Nama}</td>`;
-    } else {
-        resultEl.className = 'scan-result error';
-        resultEl.textContent = document.getElementById('statusMessage').textContent;
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (type === 'datang') {
+        const { error } = await supabase
+            .from('presensi')
+            .insert({ nisn_siswa: nisn, waktu_datang: new Date() });
+        
+        if (error) {
+            resultEl.className = 'scan-result error';
+            resultEl.textContent = 'Gagal: Siswa kemungkinan sudah presensi datang hari ini.';
+            playSound('error');
+        } else {
+            const waktu = new Date().toLocaleTimeString('id-ID');
+            playSound('success');
+            resultEl.className = 'scan-result success';
+            resultEl.innerHTML = `<strong>Presensi Datang Berhasil!</strong><br>${siswa.nama} (${nisn}) - ${waktu}`;
+        }
+    } else { // type 'pulang'
+        const { error } = await supabase
+            .from('presensi')
+            .update({ waktu_pulang: new Date() })
+            .eq('nisn_siswa', nisn)
+            .gte('waktu_datang', today.toISOString())
+            .lt('waktu_datang', tomorrow.toISOString())
+            .is('waktu_pulang', null); // Hanya update jika waktu pulang masih kosong
+
+        if (error) {
+            resultEl.className = 'scan-result error';
+            resultEl.textContent = 'Gagal: Pastikan siswa sudah presensi datang hari ini.';
+            playSound('error');
+        } else {
+            const waktu = new Date().toLocaleTimeString('id-ID');
+            playSound('success');
+            resultEl.className = 'scan-result success';
+            resultEl.innerHTML = `<strong>Presensi Pulang Berhasil!</strong><br>${siswa.nama} (${nisn}) - ${waktu}`;
+        }
     }
 }
-async function loadRawRekapData(force = false) {
-    if (!force && AppState.rekap.length > 0) return;
-    const result = await makeApiCall(`${SCRIPT_URL}?action=getRawAttendanceData`);
-    if (result) AppState.rekap = result.data;
-}
-function filterAndRenderRekap() {
+
+
+// --- FUNGSI REKAP PRESENSI (REFACTORED) ---
+// Note: Rekap akan jauh lebih efisien jika dibuatkan 'view' atau 'function' di sisi database.
+// Untuk sekarang, kita lakukan di client-side.
+async function filterAndRenderRekap() {
     const startDateStr = document.getElementById('rekapFilterTanggalMulai').value;
     const endDateStr = document.getElementById('rekapFilterTanggalSelesai').value;
-    const exportButton = document.getElementById('exportRekapButton');
     if (!startDateStr || !endDateStr) return showStatusMessage('Harap pilih rentang tanggal.', 'error');
-    const startDate = new Date(startDateStr);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(endDateStr);
-    endDate.setHours(23, 59, 59, 999);
+
     showLoading(true);
-    const filteredData = AppState.rekap.filter(row => {
-        if (!row[3]) return false;
-        const recordDate = new Date(row[3]);
-        return recordDate >= startDate && recordDate <= endDate;
-    });
-    renderRekapTable(filteredData);
-    exportButton.style.display = filteredData.length > 0 ? 'inline-block' : 'none';
-    setTimeout(() => showLoading(false), 100); 
+    const { data, error } = await supabase
+        .from('presensi')
+        .select(`
+            waktu_datang,
+            waktu_pulang,
+            status,
+            siswa ( nisn, nama )
+        `)
+        .gte('waktu_datang', startDateStr)
+        .lte('waktu_datang', `${endDateStr}T23:59:59`); // Sertakan seluruh hari di tanggal akhir
+
+    showLoading(false);
+    if (error) {
+        return showStatusMessage(`Gagal memuat rekap: ${error.message}`, 'error');
+    }
+    
+    renderRekapTable(data);
+    document.getElementById('exportRekapButton').style.display = data.length > 0 ? 'inline-block' : 'none';
 }
+
 function renderRekapTable(data) {
     const tableBody = document.getElementById('rekapTableBody');
-    const siswaMap = AppState.siswa.reduce((map, s) => { map[s.NISN] = s.Nama; return map; }, {});
     tableBody.innerHTML = data.length === 0 
         ? '<tr><td colspan="6" style="text-align: center;">Tidak ada data rekap ditemukan.</td></tr>'
         : data.map(row => {
-            const namaSiswa = siswaMap[row[1]] || row[2] || "N/A";
-            return `<tr><td data-label="Tanggal">${new Date(row[3]).toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'})}</td><td data-label="NISN">${row[1]}</td><td data-label="Nama">${namaSiswa}</td><td data-label="Datang">${row[4] ? new Date(row[4]).toLocaleTimeString('id-ID') : 'N/A'}</td><td data-label="Pulang">${row[5] ? new Date(row[5]).toLocaleTimeString('id-ID') : 'Belum'}</td><td data-label="Status">${row[6]}</td></tr>`
+            const datangDate = new Date(row.waktu_datang);
+            return `<tr>
+                <td data-label="Tanggal">${datangDate.toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'})}</td>
+                <td data-label="NISN">${row.siswa.nisn}</td>
+                <td data-label="Nama">${row.siswa.nama}</td>
+                <td data-label="Datang">${datangDate.toLocaleTimeString('id-ID')}</td>
+                <td data-label="Pulang">${row.waktu_pulang ? new Date(row.waktu_pulang).toLocaleTimeString('id-ID') : 'Belum'}</td>
+                <td data-label="Status">${row.status}</td>
+            </tr>`
         }).join('');
 }
+
 function exportRekapToExcel() {
+    // Fungsi ini tidak perlu diubah karena bekerja pada tabel HTML
     const tableBody = document.getElementById('rekapTableBody');
     if (tableBody.rows.length === 0 || (tableBody.rows.length === 1 && tableBody.rows[0].cells.length === 1)) {
          return showStatusMessage('Tidak ada data untuk diekspor.', 'info');
@@ -238,23 +292,27 @@ function exportRekapToExcel() {
     XLSX.writeFile(wb, `Rekap_Presensi_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-// --- FUNGSI MANAJEMEN SISWA (DENGAN PERBAIKAN & FITUR BARU) ---
+// --- FUNGSI MANAJEMEN SISWA (REFACTORED) ---
 async function loadSiswaAndRenderTable(force = false) {
     if (!force && AppState.siswa.length > 0) {
         renderSiswaTable(AppState.siswa);
         return;
     }
-    const result = await makeApiCall(`${SCRIPT_URL}?action=getSiswa`);
-    if (result) {
-        AppState.siswa = result.data;
-        renderSiswaTable(AppState.siswa);
-    }
+    showLoading(true);
+    const { data, error } = await supabase.from('siswa').select('*').order('nama', { ascending: true });
+    showLoading(false);
+    
+    if (error) return showStatusMessage(`Gagal memuat data siswa: ${error.message}`, 'error');
+    
+    // Mapping nama kolom agar sesuai dengan HTML
+    AppState.siswa = data.map(s => ({
+        NISN: s.nisn, Nama: s.nama, Kelas: s.kelas, WhatsappOrtu: s.whatsapp_ortu
+    }));
+    renderSiswaTable(AppState.siswa);
 }
 
-/**
- * [PERBAIKAN] Merender tabel siswa dengan kolom "Whatsapp Ortu".
- */
 function renderSiswaTable(siswaArray) {
+    // Fungsi ini tidak perlu diubah
     const tableBody = document.getElementById('siswaResultsTableBody');
     tableBody.innerHTML = siswaArray.length === 0
         ? '<tr><td colspan="5" style="text-align: center;">Data siswa tidak ditemukan.</td></tr>'
@@ -273,29 +331,34 @@ function renderSiswaTable(siswaArray) {
 }
 
 async function saveSiswa() {
-    const form = document.getElementById('formSiswa');
-    const formData = new FormData(form);
     const oldNisn = document.getElementById('formNisnOld').value;
-    formData.append('action', oldNisn ? 'updateSiswa' : 'addSiswa');
-    if (oldNisn) formData.append('oldNisn', oldNisn);
-    const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
-    if (result) {
-        showStatusMessage(result.message, 'success');
-        resetFormSiswa();
-        await loadSiswaAndRenderTable(true);
-    }
+    const siswaData = {
+        nisn: document.getElementById('formNisn').value,
+        nama: document.getElementById('formNama').value,
+        kelas: document.getElementById('formKelas').value,
+        whatsapp_ortu: document.getElementById('formWhatsappOrtu').value || null
+    };
+
+    showLoading(true);
+    const { error } = oldNisn
+        ? await supabase.from('siswa').update(siswaData).eq('nisn', oldNisn)
+        : await supabase.from('siswa').insert(siswaData);
+    showLoading(false);
+
+    if (error) return showStatusMessage(`Gagal menyimpan: ${error.message}`, 'error');
+    
+    showStatusMessage(oldNisn ? 'Data siswa berhasil diperbarui.' : 'Siswa baru berhasil ditambahkan.', 'success');
+    resetFormSiswa();
+    await loadSiswaAndRenderTable(true);
 }
 
-/**
- * [PERBAIKAN] Mengisi form edit siswa, termasuk kolom "WhatsappOrtu".
- */
 function editSiswaHandler(nisn) {
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
     if (!siswa) return;
     document.getElementById('formNisn').value = siswa.NISN;
     document.getElementById('formNama').value = siswa.Nama;
     document.getElementById('formKelas').value = siswa.Kelas;
-    document.getElementById('formWhatsappOrtu').value = siswa.WhatsappOrtu || ''; // Mengisi data WA Ortu
+    document.getElementById('formWhatsappOrtu').value = siswa.WhatsappOrtu || '';
     document.getElementById('formNisnOld').value = siswa.NISN;
     document.getElementById('saveSiswaButton').textContent = 'Update Data Siswa';
     document.getElementById('formSiswa').scrollIntoView({ behavior: 'smooth' });
@@ -309,17 +372,78 @@ function resetFormSiswa() {
 
 async function deleteSiswaHandler(nisn) {
     if (confirm(`Yakin ingin menghapus siswa dengan NISN: ${nisn}?`)) {
-        const formData = new FormData();
-        formData.append('action', 'deleteSiswa');
-        formData.append('nisn', nisn);
-        const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
-        if (result) {
-            showStatusMessage(result.message, 'success');
-            await loadSiswaAndRenderTable(true);
-        }
+        showLoading(true);
+        const { error } = await supabase.from('siswa').delete().eq('nisn', nisn);
+        showLoading(false);
+
+        if (error) return showStatusMessage(`Gagal menghapus: ${error.message}`, 'error');
+        
+        showStatusMessage('Siswa berhasil dihapus.', 'success');
+        await loadSiswaAndRenderTable(true);
     }
 }
 
+// --- FUNGSI IMPOR CSV BARU ---
+
+async function handleSiswaFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    showLoading(true);
+    Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: async function(results) {
+            if (!results.data || results.data.length === 0) {
+                showLoading(false);
+                return showStatusMessage('File CSV kosong atau formatnya salah.', 'error');
+            }
+            const dataToInsert = results.data.map(row => ({
+                nisn: row.NISN, nama: row.Nama, kelas: row.Kelas,
+                whatsapp_ortu: row['Whatsapp Ortu'] || row.WhatsappOrtu || null
+            }));
+            const { error } = await supabase.from('siswa').insert(dataToInsert, { upsert: true }); // upsert akan update jika nisn sudah ada
+            showLoading(false);
+            if (error) return showStatusMessage(`Gagal impor: ${error.message}`, 'error');
+            showStatusMessage(`${dataToInsert.length} data siswa berhasil diimpor/diperbarui!`, 'success');
+            await loadSiswaAndRenderTable(true);
+        },
+        error: (err) => {
+            showLoading(false);
+            showStatusMessage(`Gagal membaca file CSV: ${err.message}`, 'error');
+        }
+    });
+    event.target.value = '';
+}
+
+async function handlePelanggaranFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    showLoading(true);
+    Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: async function(results) {
+            if (!results.data || results.data.length === 0) {
+                showLoading(false);
+                return showStatusMessage('File CSV kosong atau formatnya salah.', 'error');
+            }
+            const dataToInsert = results.data.map(row => ({
+                tingkat: row.Tingkat, deskripsi: row.Deskripsi || row.DeskripsiPelanggaran, poin: row.Poin
+            }));
+            const { error } = await supabase.from('pelanggaran').insert(dataToInsert);
+            showLoading(false);
+            if (error) return showStatusMessage(`Gagal impor: ${error.message}`, 'error');
+            showStatusMessage(`${dataToInsert.length} data pelanggaran berhasil diimpor!`, 'success');
+            await loadPelanggaranData(); // Muat ulang data pelanggaran
+        },
+        error: (err) => {
+            showLoading(false);
+            showStatusMessage(`Gagal membaca file CSV: ${err.message}`, 'error');
+        }
+    });
+    event.target.value = '';
+}
+
+
+// --- FUNGSI QR CODE & EKSPOR LAINNYA (TIDAK BERUBAH) ---
 function generateQRHandler(nisn) {
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
     if (!siswa) return;
@@ -330,7 +454,6 @@ function generateQRHandler(nisn) {
     new QRCode(canvas, { text: siswa.NISN.toString(), width: 200, height: 200, correctLevel: QRCode.CorrectLevel.H });
     document.getElementById('qrModal').style.display = 'flex';
 }
-
 function printQrCode() {
     const modalContent = document.querySelector("#qrModal .modal-content").cloneNode(true);
     modalContent.querySelector('.modal-close-button')?.remove();
@@ -341,14 +464,8 @@ function printQrCode() {
     printWindow.focus();
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
 }
-
-/**
- * [FITUR BARU] Mengekspor data semua siswa dari AppState ke file Excel.
- */
 function exportSiswaToExcel() {
-    if (AppState.siswa.length === 0) {
-        return showStatusMessage('Tidak ada data siswa untuk diekspor.', 'info');
-    }
+    if (AppState.siswa.length === 0) return showStatusMessage('Tidak ada data siswa untuk diekspor.', 'info');
     const dataForSheet = [['NISN', 'Nama', 'Kelas', 'Whatsapp Orang Tua']];
     AppState.siswa.forEach(siswa => {
         dataForSheet.push([siswa.NISN, siswa.Nama, siswa.Kelas, siswa.WhatsappOrtu || '']);
@@ -359,15 +476,8 @@ function exportSiswaToExcel() {
     XLSX.writeFile(workbook, `Data_Siswa_${new Date().toISOString().slice(0, 10)}.xlsx`);
     showStatusMessage('Data siswa berhasil diekspor ke Excel.', 'success');
 }
-
-/**
- * [FITUR BARU] Membuka jendela baru yang berisi semua QR code siswa dalam format kartu, siap untuk dicetak.
- */
 function exportAllQrCodes() {
-    if (AppState.siswa.length === 0) {
-        showStatusMessage("Tidak ada data siswa untuk mencetak QR code.", "info");
-        return;
-    }
+    if (AppState.siswa.length === 0) return showStatusMessage("Tidak ada data siswa untuk mencetak QR code.", "info");
     showLoading(true);
     const printWindow = window.open('', '_blank');
     printWindow.document.write('<html><head><title>Cetak Semua QR Code Siswa</title>');
@@ -382,93 +492,36 @@ function exportAllQrCodes() {
             const canvas = printWindow.document.getElementById(`qr-canvas-${siswa.NISN}`);
             if (canvas) new QRCode(canvas, { text: siswa.NISN.toString(), width: 180, height: 180, correctLevel: QRCode.CorrectLevel.H });
         });
-        setTimeout(() => {
-            showLoading(false);
-            printWindow.document.close();
-            printWindow.focus();
-            printWindow.print();
-        }, 1000);
+        setTimeout(() => { showLoading(false); printWindow.document.close(); printWindow.focus(); printWindow.print(); }, 1000);
     }, 500);
 }
 
-// --- FUNGSI MANAJEMEN PENGGUNA (TIDAK BERUBAH) ---
-async function loadUsers(force = false) {
-    if (!force && AppState.users.length > 0) {
-        renderUsersTable(AppState.users);
-        return;
-    }
-    const result = await makeApiCall(`${SCRIPT_URL}?action=getUsers`);
-    if (result) {
-        AppState.users = result.data;
-        renderUsersTable(AppState.users);
-    }
-}
-function renderUsersTable(usersArray) {
-    const tableBody = document.getElementById('penggunaResultsTableBody');
-    tableBody.innerHTML = usersArray.length === 0
-        ? '<tr><td colspan="4" style="text-align: center;">Belum ada pengguna.</td></tr>'
-        : usersArray.map(user => `<tr><td data-label="Nama">${user.nama}</td><td data-label="Username">${user.username}</td><td data-label="Peran">${user.peran}</td><td data-label="Aksi"><button class="btn btn-sm btn-secondary" onclick="editUserHandler('${user.username}')">Ubah</button><button class="btn btn-sm btn-danger" onclick="deleteUserHandler('${user.username}')">Hapus</button></td></tr>`).join('');
-}
-async function saveUser() {
-    const form = document.getElementById('formPengguna');
-    const formData = new FormData(form);
-    const oldUsername = document.getElementById('formUsernameOld').value;
-    const password = document.getElementById('formPassword').value;
-    if (!oldUsername && !password) return showStatusMessage('Password wajib diisi untuk pengguna baru.', 'error');
-    formData.append('action', oldUsername ? 'updateUser' : 'addUser');
-    if (oldUsername) formData.append('oldUsername', oldUsername);
-    const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
-    if (result) {
-        showStatusMessage(result.message, 'success');
-        resetFormPengguna();
-        await loadUsers(true);
-    }
-}
-function editUserHandler(username) {
-    const user = AppState.users.find(u => u.username === username);
-    if (!user) return;
-    document.getElementById('formUsernameOld').value = user.username;
-    document.getElementById('formNamaPengguna').value = user.nama;
-    document.getElementById('formUsername').value = user.username;
-    document.getElementById('formPeran').value = user.peran;
-    document.getElementById('formPassword').value = '';
-    document.getElementById('savePenggunaButton').textContent = 'Update Pengguna';
-    document.getElementById('formPengguna').scrollIntoView({ behavior: 'smooth' });
-}
-async function deleteUserHandler(username) {
-    const loggedInUser = JSON.parse(sessionStorage.getItem('loggedInUser'));
-    if (loggedInUser?.username === username) return showStatusMessage('Anda tidak dapat menghapus akun Anda sendiri.', 'error');
-    if (confirm(`Yakin ingin menghapus pengguna '${username}'?`)) {
-        const formData = new FormData();
-        formData.append('action', 'deleteUser');
-        formData.append('username', username);
-        const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
-        if (result) {
-            showStatusMessage(result.message, 'success');
-            await loadUsers(true);
-        }
-    }
-}
-function resetFormPengguna() {
-    document.getElementById('formPengguna').reset();
-    document.getElementById('formUsernameOld').value = '';
-    document.getElementById('savePenggunaButton').textContent = 'Simpan Pengguna';
+
+// --- FUNGSI MANAJEMEN PENGGUNA (TIDAK DISARANKAN DI CLIENT-SIDE, TAPI DITINGGALKAN UNTUK KELENGKAPAN) ---
+// CATATAN PENTING: Mengelola pengguna (membuat/menghapus) dari client-side adalah risiko keamanan.
+// Ini seharusnya dilakukan melalui Supabase Edge Functions dengan hak akses admin.
+// Kode di bawah ini ditinggalkan, tetapi membutuhkan kebijakan RLS yang sangat hati-hati.
+async function loadUsers() { console.warn("Fungsi loadUsers perlu implementasi RLS yang aman."); }
+async function saveUser() { console.warn("Fungsi saveUser perlu dipindah ke Edge Function."); }
+async function deleteUserHandler() { console.warn("Fungsi deleteUserHandler perlu dipindah ke Edge Function."); }
+function resetFormPengguna() { document.getElementById('formPengguna').reset(); }
+
+
+// --- FUNGSI MODUL KEDISIPLINAN (REFACTORED) ---
+async function loadPelanggaranData() {
+    const { data, error } = await supabase.from('pelanggaran').select('*');
+    if (error) return console.error("Gagal memuat data pelanggaran:", error);
+    AppState.pelanggaran = data;
+    populateDisciplineRecommendations();
 }
 
-// --- FUNGSI MODUL KEDISIPLINAN (TIDAK BERUBAH) ---
-async function loadPelanggaranData() {
-    const result = await makeApiCall(`${SCRIPT_URL}?action=getPelanggaranData`, {}, false);
-    if (result) {
-        AppState.pelanggaran = result.data;
-        populateDisciplineRecommendations();
-    }
-}
 function handleNisnDisiplinInput() {
     const nisn = document.getElementById('nisnDisiplinInput').value;
     const namaEl = document.getElementById('namaSiswaDisiplin');
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
     namaEl.value = siswa ? siswa.Nama : '';
 }
+
 function populateDisciplineRecommendations() {
     const tingkatList = document.getElementById('tingkatList');
     const deskripsiList = document.getElementById('deskripsiList');
@@ -477,6 +530,7 @@ function populateDisciplineRecommendations() {
     tingkatList.innerHTML = semuaTingkat.map(t => `<option value="${t}"></option>`).join('');
     deskripsiList.innerHTML = AppState.pelanggaran.map(p => `<option value="${p.deskripsi}"></option>`).join('');
 }
+
 function handleTingkatChange() {
     const tingkatInput = document.getElementById('tingkatDisiplinInput').value;
     const deskripsiList = document.getElementById('deskripsiList');
@@ -484,35 +538,56 @@ function handleTingkatChange() {
     let filteredPelanggaran = tingkatInput ? AppState.pelanggaran.filter(p => p.tingkat === tingkatInput) : AppState.pelanggaran;
     deskripsiList.innerHTML = filteredPelanggaran.map(p => `<option value="${p.deskripsi}"></option>`).join('');
 }
+
 async function handleSubmitDisiplin(event) {
     event.preventDefault();
-    const form = document.getElementById('formDisiplin');
-    const formData = new FormData(form);
-    formData.append('action', 'saveCatatanDisiplin');
-    const result = await makeApiCall(SCRIPT_URL, { method: 'POST', body: formData });
-    if (result) {
-        showStatusMessage(result.message, 'success');
-        form.reset();
-        document.getElementById('namaSiswaDisiplin').value = '';
-    }
+    const nisn = document.getElementById('nisnDisiplinInput').value;
+    const tingkat = document.getElementById('tingkatDisiplinInput').value;
+    const deskripsi = document.getElementById('deskripsiDisiplinInput').value;
+
+    const pelanggaran = AppState.pelanggaran.find(p => p.deskripsi === deskripsi);
+    const poin = pelanggaran ? pelanggaran.poin : 0;
+
+    const { error } = await supabase.from('catatan_disiplin').insert({
+        nisn_siswa: nisn, tingkat, deskripsi, poin
+    });
+
+    if (error) return showStatusMessage(`Gagal menyimpan catatan: ${error.message}`, 'error');
+    
+    showStatusMessage('Catatan kedisiplinan berhasil disimpan.', 'success');
+    document.getElementById('formDisiplin').reset();
+    document.getElementById('namaSiswaDisiplin').value = '';
 }
+
 async function handleSearchRiwayatDisiplin() {
     const nisn = document.getElementById('searchNisnDisiplin').value;
     if (!nisn) return showStatusMessage("Harap masukkan NISN untuk mencari riwayat.", "info");
-    const result = await makeApiCall(`${SCRIPT_URL}?action=getRiwayatDisiplin&nisn=${nisn}`);
-    if (result) renderRiwayatDisiplinTable(result.data);
+    
+    showLoading(true);
+    const { data, error } = await supabase
+        .from('catatan_disiplin')
+        .select('*')
+        .eq('nisn_siswa', nisn)
+        .order('created_at', { ascending: false });
+    showLoading(false);
+
+    if (error) return showStatusMessage(`Gagal mencari riwayat: ${error.message}`, 'error');
+
+    renderRiwayatDisiplinTable(data);
 }
+
 function renderRiwayatDisiplinTable(riwayatArray) {
     const tableBody = document.getElementById('riwayatDisiplinTableBody');
     if (riwayatArray.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Tidak ada riwayat kedisiplinan ditemukan.</td></tr>';
         return;
     }
-    tableBody.innerHTML = riwayatArray.map(r => `<tr><td data-label="Tanggal">${r.tanggal}</td><td data-label="Tingkat">${r.tingkat}</td><td data-label="Deskripsi">${r.deskripsi}</td><td data-label="Poin">${r.poin}</td></tr>`).join('');
-}
-async function loadAllSiswaIntoCache() {
-    const result = await makeApiCall(`${SCRIPT_URL}?action=getSiswa`, {}, false);
-    if (result) AppState.siswa = result.data;
+    tableBody.innerHTML = riwayatArray.map(r => `<tr>
+        <td data-label="Tanggal">${new Date(r.created_at).toLocaleDateString('id-ID')}</td>
+        <td data-label="Tingkat">${r.tingkat}</td>
+        <td data-label="Deskripsi">${r.deskripsi}</td>
+        <td data-label="Poin">${r.poin}</td>
+    </tr>`).join('');
 }
 
 // ====================================================================
@@ -532,11 +607,10 @@ function setupDashboardListeners() {
             const actions = {
                 datangSection: () => startQrScanner('datang'),
                 pulangSection: () => startQrScanner('pulang'),
-                rekapSection: async () => {
+                rekapSection: () => {
                     const today = new Date().toISOString().slice(0, 10);
                     document.getElementById('rekapFilterTanggalMulai').value = today;
                     document.getElementById('rekapFilterTanggalSelesai').value = today;
-                    await loadRawRekapData();
                     filterAndRenderRekap();
                 },
                 disiplinSection: () => {},
@@ -548,12 +622,6 @@ function setupDashboardListeners() {
     });
 
     document.getElementById('refreshSiswaButton')?.addEventListener('click', () => loadSiswaAndRenderTable(true));
-    document.getElementById('refreshUsersButton')?.addEventListener('click', () => loadUsers(true));
-    document.getElementById('refreshRekapButton')?.addEventListener('click', async () => {
-        await loadRawRekapData(true);
-        filterAndRenderRekap();
-    });
-    
     document.getElementById('filterRekapButton')?.addEventListener('click', filterAndRenderRekap);
     document.getElementById('exportRekapButton')?.addEventListener('click', exportRekapToExcel);
     document.getElementById('formSiswa')?.addEventListener('submit', (e) => { e.preventDefault(); saveSiswa(); });
@@ -564,11 +632,16 @@ function setupDashboardListeners() {
         document.getElementById('qrModal').style.display = 'none';
     });
     document.getElementById('printQrButton')?.addEventListener('click', printQrCode);
-
-    // [PERBAIKAN] Menambahkan listener untuk tombol-tombol ekspor baru
     document.getElementById('exportSiswaExcelButton')?.addEventListener('click', exportSiswaToExcel);
     document.getElementById('exportAllQrButton')?.addEventListener('click', exportAllQrCodes);
 
+    // Listener untuk fitur impor
+    document.getElementById('importSiswaButton')?.addEventListener('click', () => document.getElementById('importSiswaInput').click());
+    document.getElementById('importSiswaInput')?.addEventListener('change', handleSiswaFileSelect);
+    document.getElementById('importPelanggaranButton')?.addEventListener('click', () => document.getElementById('importPelanggaranInput').click());
+    document.getElementById('importPelanggaranInput')?.addEventListener('change', handlePelanggaranFileSelect);
+
+    // Listener untuk modul disiplin
     document.getElementById('nisnDisiplinInput')?.addEventListener('blur', handleNisnDisiplinInput);
     document.getElementById('tingkatDisiplinInput')?.addEventListener('input', handleTingkatChange);
     document.getElementById('formDisiplin')?.addEventListener('submit', handleSubmitDisiplin);
@@ -576,17 +649,16 @@ function setupDashboardListeners() {
 }
 
 async function initDashboardPage() {
-    checkAuthentication();
+    await checkAuthenticationAndSetup();
     setupDashboardListeners();
-    await loadAllSiswaIntoCache(); 
+    await loadSiswaAndRenderTable();
     await loadPelanggaranData();
     document.querySelector('.section-nav button[data-section="datangSection"]')?.click();
 }
 
-function initLoginPage() {
-    checkAuthentication();
+async function initLoginPage() {
+    await checkAuthenticationAndSetup();
     setupPasswordToggle();
-    document.querySelector('.login-box form')?.addEventListener('submit', (e) => { e.preventDefault(); handleLogin(); });
 }
 
 // ====================================================================
