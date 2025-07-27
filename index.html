@@ -21,15 +21,15 @@
     <link rel="stylesheet" href="style.css">
 
 
-     <!-- GANTI KODE FAVICON LAMA ANDA DENGAN BLOK KODE SEDERHANA INI -->
+    <!-- GANTI KODE FAVICON LAMA ANDA DENGAN BLOK KODE SEDERHANA INI -->
 
-        <!-- Menggunakan satu logo untuk semua keperluan ikon -->
-        <link rel="icon" href="https://raw.githubusercontent.com/Wahyudi-1/presensieksperimen/main/Logo.png">
-        <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/Wahyudi-1/presensieksperimen/main/Logo.png">
+    <!-- Menggunakan satu logo untuk semua keperluan ikon -->
+    <link rel="icon" href="https://raw.githubusercontent.com/Wahyudi-1/presensieksperimen/main/Logo.png">
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/Wahyudi-1/presensieksperimen/main/Logo.png">
+    
+    <!-- Nama aplikasi untuk iOS -->
+    <meta name="apple-mobile-web-app-title" content="Kedisiplinan">
         
-        <!-- Nama aplikasi untuk iOS -->
-        <meta name="apple-mobile-web-app-title" content="Kedisiplinan">
-            
     <!-- Akhir dari blok kode favicon -->
         
 </head>
@@ -66,10 +66,12 @@
                 <!-- Form dibuat agar submit dengan tombol Enter juga berfungsi -->
                 <form onsubmit="event.preventDefault(); handleLogin();">
                     
+                    <!-- ========== PERUBAHAN DI SINI ========== -->
                     <div class="form-group">
-                        <label for="username">Username</label>
-                        <input type="text" id="username" placeholder="Masukkan username Anda" required autocomplete="username">
+                        <label for="username">Email</label>
+                        <input type="email" id="username" placeholder="Masukkan alamat email Anda" required autocomplete="email">
                     </div>
+                    <!-- ========== AKHIR PERUBAHAN ========== -->
                     
                     <!-- Wrapper untuk input password dan ikon toggle -->
                     <div class="form-group">
@@ -105,13 +107,12 @@
     <!-- JAVASCRIPT LIBRARIES & SCRIPT                              -->
     <!-- Ditempatkan di akhir body untuk rendering halaman yg lebih cepat -->
     <!-- ========================================================== -->
-
-    <!-- Library untuk Export ke Excel -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- TAMBAHKAN BARIS INI -->
+    <!-- ========== PERUBAHAN DI SINI ========== -->
+    <!-- Library untuk Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
+    <!-- ========== AKHIR PERUBAHAN ========== -->
+
     <!-- Script utama aplikasi -->
     <script src="app.js"></script>
 
