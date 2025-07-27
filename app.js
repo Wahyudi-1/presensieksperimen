@@ -239,6 +239,7 @@ function stopQrScanner(type) {
 async function processQrScan(nisn, type) {
     const resultEl = document.getElementById(type === 'datang' ? 'scanResultDatang' : 'scanResultPulang');
     
+    // 1. Validasi apakah siswa terdaftar (ini sudah benar)
     const { data: siswa, error: siswaError } = await supabase
         .from('siswa')
         .select('nama')
@@ -254,19 +255,48 @@ async function processQrScan(nisn, type) {
         return;
     }
 
+    // Tentukan rentang waktu untuk hari ini
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    // 2. Cek status presensi hari ini SEBELUM melakukan aksi
+    const { data: presensiHariIni, error: cekError } = await supabase
+        .from('presensi')
+        .select('waktu_datang, waktu_pulang')
+        .eq('nisn_siswa', nisn)
+        .gte('waktu_datang', today.toISOString())
+        .lt('waktu_datang', tomorrow.toISOString())
+        .maybeSingle(); // Ambil satu baris jika ada, atau null jika tidak ada
+
+    if (cekError) {
+        const errorMessage = `Gagal memeriksa data presensi: ${cekError.message}`;
+        resultEl.className = 'scan-result error';
+        resultEl.textContent = errorMessage;
+        playSound('error');
+        return;
+    }
+
+    // 3. Logika baru berdasarkan hasil pengecekan
     if (type === 'datang') {
-        const { error } = await supabase
+        if (presensiHariIni) {
+            // Jika data sudah ada, berarti siswa sudah presensi datang
+            const errorMessage = `DITOLAK: ${siswa.nama} sudah melakukan presensi datang hari ini.`;
+            resultEl.className = 'scan-result error';
+            resultEl.textContent = errorMessage;
+            playSound('error');
+            return;
+        }
+
+        // Jika tidak ada data, lanjutkan untuk insert
+        const { error: insertError } = await supabase
             .from('presensi')
             .insert({ nisn_siswa: nisn, waktu_datang: new Date() });
         
-        if (error) {
+        if (insertError) {
             resultEl.className = 'scan-result error';
-            resultEl.textContent = 'Gagal: Siswa kemungkinan sudah presensi datang hari ini.';
+            resultEl.textContent = `Gagal menyimpan: ${insertError.message}`;
             playSound('error');
         } else {
             const waktu = new Date().toLocaleTimeString('id-ID');
@@ -274,18 +304,36 @@ async function processQrScan(nisn, type) {
             resultEl.className = 'scan-result success';
             resultEl.innerHTML = `<strong>Presensi Datang Berhasil!</strong><br>${siswa.nama} (${nisn}) - ${waktu}`;
         }
-    } else {
-        const { error } = await supabase
+
+    } else { // type 'pulang'
+        if (!presensiHariIni) {
+            // Jika tidak ada data sama sekali, berarti belum presensi datang
+            const errorMessage = `DITOLAK: ${siswa.nama} belum melakukan presensi datang hari ini.`;
+            resultEl.className = 'scan-result error';
+            resultEl.textContent = errorMessage;
+            playSound('error');
+            return;
+        }
+
+        if (presensiHariIni && presensiHariIni.waktu_pulang) {
+            // Jika data ada DAN waktu_pulang sudah terisi
+            const errorMessage = `DITOLAK: ${siswa.nama} sudah melakukan presensi pulang hari ini.`;
+            resultEl.className = 'scan-result error';
+            resultEl.textContent = errorMessage;
+            playSound('error');
+            return;
+        }
+
+        // Jika data ada dan waktu_pulang kosong, lanjutkan update
+        const { error: updateError } = await supabase
             .from('presensi')
             .update({ waktu_pulang: new Date() })
             .eq('nisn_siswa', nisn)
-            .gte('waktu_datang', today.toISOString())
-            .lt('waktu_datang', tomorrow.toISOString())
-            .is('waktu_pulang', null);
+            .gte('waktu_datang', today.toISOString());
 
-        if (error) {
+        if (updateError) {
             resultEl.className = 'scan-result error';
-            resultEl.textContent = 'Gagal: Pastikan siswa sudah presensi datang hari ini.';
+            resultEl.textContent = `Gagal menyimpan: ${updateError.message}`;
             playSound('error');
         } else {
             const waktu = new Date().toLocaleTimeString('id-ID');
