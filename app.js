@@ -21,42 +21,13 @@ const { createClient } = window.supabase;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 
-// --- State Aplikasi --- (Versi Baru dengan "Store")
-const AppStore = (function() {
-    // _state ini sekarang "private", tidak bisa diakses dari luar.
-    const _state = {
-        siswa: [],
-        users: [],
-        rekap: [],
-        pelanggaran: [],
-    };
-
-    // Fungsi untuk MEMBACA state.
-    // Mengembalikan salinan agar state asli tidak bisa diubah secara tidak sengaja.
-    function getState(key) {
-        if (_state.hasOwnProperty(key)) {
-            // Menggunakan spread operator (...) untuk membuat salinan array/objek.
-            return Array.isArray(_state[key]) ? [..._state[key]] : { ..._state[key] };
-        }
-        return undefined;
-    }
-
-    // Fungsi untuk MENGUBAH state. Ini adalah satu-satunya gerbang untuk mutasi.
-    function setState(key, value) {
-        if (_state.hasOwnProperty(key)) {
-            _state[key] = value;
-            console.log(`State '${key}' diperbarui.`, value); // Opsional: untuk debugging
-        } else {
-            console.warn(`Peringatan: Mencoba mengatur state yang tidak ada: '${key}'`);
-        }
-    }
-
-    // Hanya "getState" dan "setState" yang bisa diakses dari luar.
-    return {
-        getState,
-        setState
-    };
-})();
+// --- State Aplikasi ---
+const AppState = {
+    siswa: [],
+    users: [],
+    rekap: [],
+    pelanggaran: [],
+};
 
 let qrScannerDatang, qrScannerPulang;
 let isScanning = { datang: false, pulang: false };
@@ -473,11 +444,10 @@ async function loadSiswaAndRenderTable(force = false) {
     
     if (error) return showStatusMessage(`Gagal memuat data siswa: ${error.message}`, 'error');
     
-    const siswaData = data.map(s => ({
+    AppState.siswa = data.map(s => ({
         NISN: s.nisn, Nama: s.nama, Kelas: s.kelas, WhatsappOrtu: s.whatsapp_ortu
     }));
-    AppStore.setState('siswa', siswaData); // Menggunakan "pustakawan" untuk menyimpan data
-    renderSiswaTable(AppStore.getState('siswa')); // Menggunakan "pustakawan" untuk membaca data
+    renderSiswaTable(AppState.siswa);
 }
 
 function renderSiswaTable(siswaArray) {
@@ -521,7 +491,6 @@ async function saveSiswa() {
 }
 
 function editSiswaHandler(nisn) {
-    const siswaArray = AppStore.getState('siswa'); // Ambil data dulu
     const siswa = AppState.siswa.find(s => s.NISN == nisn);
     if (!siswa) return;
     document.getElementById('formNisn').value = siswa.NISN;
